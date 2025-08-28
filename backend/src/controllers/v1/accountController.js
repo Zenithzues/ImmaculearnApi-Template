@@ -50,7 +50,7 @@ class AccountController {
 
       const result = await this.user.verify(email, password);
 
-      if (!result?.id) {
+      if (!result?.account_id) {
         return res.json({
           success: false,
           message: 'Invalid email or password',
@@ -86,17 +86,17 @@ class AccountController {
    */
   async profile(req, res) {
     try {
-      const userInfo = await this.user.get(res.locals.username);
+      const userInfo = await this.user.get(res.locals.account_id);
 
       res.json({
         success: true,
         data: {
-          username: res.locals.username,
-          fullname: userInfo?.fullname,
+          account_id: res.locals.account_id,
+          fullname: userInfo?.f_name + ' ' + userInfo?.l_name,
         }
       })
       res.end();
-    } catch (err) {
+    } catch (err) {a
       res.json({
         success: false,
         message: err.toString(),

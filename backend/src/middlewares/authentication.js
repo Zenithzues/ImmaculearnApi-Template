@@ -27,7 +27,7 @@ export default function authorization(req, res, next) {
       return;
     }
 
-    res.locals.username = decoded?.username;
+    res.locals.account_id = decoded?.account_id;
     res.locals.authenticated = true;
     next();
   });

@@ -42,7 +42,7 @@ class User {
   async verify(email, password) {
     try {
       const [results,] = await connection.execute(
-        'SELECT account_id, email, f_name, l_name FROM account WHERE email = ? AND password = ?',
+        'SELECT account_id FROM account WHERE email = ? AND password = ?',
         [email, encryptPassword(password)],
       )
 
@@ -56,16 +56,16 @@ class User {
   /**
    * Get user's information
    *
-   * @param {string} username 
+   * @param {number} account_id 
    * @returns {Object}
    * @throws {Error}
    *
    */
-  async get(username) {
+  async get(account_id) {
     try {
       const [results,] = await connection.execute(
-        'SELECT fullname FROM users WHERE username = ?',
-        [username]
+        'SELECT f_name, l_name FROM profile WHERE account_id = ?',
+        [account_id]
       )
 
       return results?.[0];

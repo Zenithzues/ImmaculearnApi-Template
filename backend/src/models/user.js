@@ -42,10 +42,11 @@ class User {
   async verify(email, password) {
     try {
       const [results,] = await connection.execute(
-        'SELECT account_id FROM account WHERE email = ? AND password = ?',
+        'SELECT account_id FROM account WHERE username = ? AND password = ?',
         [email, encryptPassword(password)],
       )
 
+      console.log(results?.[0])
       return results?.[0];
     } catch (err) {
       console.error('<error> user.verify', err);
@@ -64,7 +65,11 @@ class User {
   async get(account_id) {
     try {
       const [results,] = await connection.execute(
-        'SELECT f_name, l_name FROM profile WHERE account_id = ?',
+        `SELECT p.f_name, p.l_name FROM profile AS p
+        LEFT JOIN account AS a
+        ON a.profile_id = p.profile_id 
+        WHERE a.account_id = ?
+        `,
         [account_id]
       )
 

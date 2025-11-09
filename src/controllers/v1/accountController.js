@@ -48,6 +48,7 @@ class AccountController {
     try {
       const { email, password } = req.body || {};
 
+      console.log(email, password)
       const result = await this.user.verify(email, password);
 
       if (!result?.account_id) {

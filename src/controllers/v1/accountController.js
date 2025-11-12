@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../../models/user.js';
+import socket from '../../core/socket.js';
 
 class AccountController {
   constructor() {
@@ -57,6 +58,10 @@ class AccountController {
           message: 'Invalid email or password',
         });
       }
+
+      const io = socket.getIO();
+
+      io.emit("user:login", { userId: result?.account_id, email: email})
 
       res.json({
         success: true,

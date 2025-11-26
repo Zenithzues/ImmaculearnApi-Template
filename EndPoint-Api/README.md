@@ -58,8 +58,14 @@ Verify JWT token and fetch user information
   "success": true,
   "data": {
     "user_id": 1,
-    "username": "johnd",
+    "profileImage":"https://example.com/images/user.jpg",
+    "firstName": "Nathaniel",
+    "lastName": "Faborada",
     "email": "johnd@example.com",
+    "course": "BSCS",
+    "year": "4rth",
+    "gender": "Male",
+    "bio" : "Kung kaya ni raecell, kaya den ni wilson",
     "created_at": "2024-10-11T12:00:00Z"
   }
 }
@@ -186,11 +192,18 @@ search other user IN CHATLIST
   "data": {
     "users": [
       {
-        "user_id": 123,
-        "username": "",
-        "full_name": "",
-        "profile_image": "https://example.com/images/user2.jpg"
+        "user_id": 1
+        "firstName": "Nathaniel",
+        "lastName": "Faborada",
+        "profileImage": "https://example.com/images/user1.jpg"
+      },
+      {
+        "user_id": 2
+        "firstName": "wilson",
+        "lastName": "Esmabe",
+        "profileImage": "https://example.com/images/user2.jpg"
       }
+
     ]
   }
 }
@@ -245,3 +258,4 @@ reset or change password of the user.
  "message": "password successfully reset."
   }
 ```
+

@@ -8,16 +8,11 @@ const accountRouter = new Router();
 const account = new AccountController();
 
 // Ensure that all endpoints implements authorization
-// OAuth using Google Platform
-accountRouter.get('/oauth/google/redirect', account.oauthGoogleRedirect.bind(account));
-accountRouter.get('/oauth/google/callback', account.oauthGoogleCallback.bind(account));
 accountRouter.use(authorization);
 
 accountRouter.post('/login', account.login.bind(account));
 accountRouter.post('/', account.create.bind(account));
 accountRouter.get('/', authentication, account.profile.bind(account));
-
-
 
 export default accountRouter;
 

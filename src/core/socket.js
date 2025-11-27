@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 
 let io;
-const onlineUser = new Map()
+const onlineUsers = new Map(); // key = userId, value = socket.id
 
 export default {
   init: (server) => {
@@ -12,27 +12,36 @@ export default {
     io.on('connection', (socket) => {
       console.log('A user connected:', socket.id);
 
-      socket.on("user:join", (socketId) => {
-        onlineUser.set(socketId);
-        console.log(`User ${socketId} is Online`)
+      // When user joins, they send their userId
+      socket.on("user:join", (userId) => {
+        onlineUsers.set(userId, socket.id);
+        console.log(`User ${userId} is online`);
 
-        socket.emit("onlineUser:update", Array.from(onlineUser.keys()));
-      })
-
+        // Broadcast updated online users list
+        io.emit("onlineUser:update", Array.from(onlineUsers.keys()));
+      });
 
       socket.on('disconnect', () => {
-        for (const [socketId] of onlineUser.entries()) {
-          if (socketId === socket.id) {
-            onlineUser.delete(socketId);
-            console.log(`User ${socketId} Disconnected`);
-            io.emit("onlineUsers:update", Array.from(onlineUser.entries()));
-            break
+        // Remove user by matching socket.id
+        let disconnectedUserId = null;
+        for (const [userId, id] of onlineUsers.entries()) {
+          if (id === socket.id) {
+            disconnectedUserId = userId;
+            break;
           }
+        }
+
+        if (disconnectedUserId) {
+          onlineUsers.delete(disconnectedUserId);
+          console.log(`User ${disconnectedUserId} disconnected`);
+          io.emit("onlineUser:update", Array.from(onlineUsers.keys()));
         }
       });
     });
+
     return io;
   },
+
   getIO: () => {
     if (!io) {
       throw new Error('Socket.io not initialized!');

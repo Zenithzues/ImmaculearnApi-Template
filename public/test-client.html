@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>CRDT WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-size: 16px;
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>CRDT WebSocket Test</h1>
+    <textarea id="sharedText" placeholder="Type here to sync with other clients..."></textarea>
+
+    <script type="module">
+        import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.6.27/dist/yjs.mjs';
+        import { WebsocketProvider } from 'https://cdn.jsdelivr.net/npm/y-websocket@1.5.10/dist/y-websocket.mjs';
+
+        const doc = new Y.Doc();
+
+        // Connect to your CRDT WebSocket server
+        const wsUrl = `ws://${location.hostname}:3000`;
+        const provider = new WebsocketProvider(wsUrl, 'default-doc', doc);
+
+        provider.on('status', event => console.log('CRDT Status:', event.status));
+        provider.on('synced', synced => console.log('CRDT Synced?', synced));
+
+        // Shared Y.Text type
+        const yText = doc.getText('shared-text');
+
+        const textarea = document.getElementById('sharedText');
+        yText.observe(() => {
+            if (textarea.value !== yText.toString()) {
+                textarea.value = yText.toString();
+            }
+        });
+
+        textarea.addEventListener('input', () => {
+            yText.delete(0, yText.length);
+            yText.insert(0, textarea.value);
+        });
+    </script>
+</body>
+
+</html>

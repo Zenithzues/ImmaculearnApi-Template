@@ -6,3 +6,4 @@ dist
 
 # Firebase service account
 src/core/serviceAccountKey.jsonsrc/core/serviceAccountKey.json
+src/core/serviceAccountKey.json

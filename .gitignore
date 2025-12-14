@@ -2,3 +2,7 @@
 .env
 node_modules
 dist
+
+
+# Firebase service account
+core/serviceAccountKey.json

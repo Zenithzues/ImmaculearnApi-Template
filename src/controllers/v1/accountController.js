@@ -14,6 +14,7 @@ class AccountController {
     const role = req.query.role;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI;
     const clientId = process.env.GOOGLE_CLIENT_ID;
+    console.log(redirectUri)
     const scope = [
       "openid",
       "email",
@@ -28,6 +29,8 @@ class AccountController {
       `&scope=${encodeURIComponent(scope)}` +
       `&access_type=offline` +
       `&prompt=consent`;
+
+    console.log(authUrl)
 
     const state = Buffer.from(JSON.stringify({ role })).toString('base64');
     return res.redirect(authUrl + `&state=${state}`);

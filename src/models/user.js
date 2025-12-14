@@ -15,7 +15,7 @@ class User {
   }
 
   async findByGoogleId(googleId) {
-    const query = 'SELECT * FROM users WHERE google_id = ? LIMIT 1';
+    const query = 'SELECT * FROM accounts WHERE google_id = ? LIMIT 1';
     const [rows] = await this.db.execute(query, [googleId]);
     return rows[0] || null;
   }
@@ -23,21 +23,39 @@ class User {
 
   async createPartialGoogleUser({ googleId, email, picture }) {
     const query =
-      'INSERT INTO users (google_id, email, picture, created_at) VALUES (?, ?, ?, NOW())';
-    const [result] = await this.db.execute(query, [googleId, email, picture]);
+      'INSERT INTO accounts (google_id, email, created_at) VALUES (?, ?, NOW())';
+    const [result] = await this.db.execute(query, [googleId, email]);
 
     return { id: result.insertId, googleId, email, picture };
   }
 
-  async completeOnboarding(userId, data) {
-    const { f_name, l_name, birthdate, department_id, password, role } = data;
-    const query =
-      `UPDATE users 
-       SET f_name = ?, l_name = ?, birthdate = ?, department_id = ?, pwsd = ?, role = ? 
-       WHERE account_id = ?`;
-    await this.db.execute(query, [f_name, l_name, birthdate, department_id, password, role, userId]);
+  async completeStudentOnboarding(userId, data) {
+    const { f_name, l_name, birthdate, department_id, password } = data;
+    
+    const connection = await this.db.getConnection(); // assume MySQL pool
+    try {
+      await connection.beginTransaction();
 
-    return this.get(userId);
+      // 1️⃣ Update accounts table (store password)
+      const hashedPassword = encryptPassword(password); // e.g., bcrypt
+      const updateAccountQuery = 'UPDATE accounts SET pswd = ? WHERE account_id = ?';
+      await connection.execute(updateAccountQuery, [hashedPassword, userId]);
+
+      // 2️⃣ Update students table (personal info)
+      const updateStudentQuery = `
+        UPDATE students
+        SET f_name = ?, l_name = ?, birthdate = ?, department_id = ?
+        WHERE account_id = ?`;
+      await connection.execute(updateStudentQuery, [f_name, l_name, birthdate, department_id, userId]);
+
+      // Commit transaction
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   /**

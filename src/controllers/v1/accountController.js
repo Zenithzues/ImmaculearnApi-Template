@@ -1,12 +1,15 @@
-import jwt from 'jsonwebtoken';
+import crypto from 'crypto'
 import User from '../../models/user.js';
 import socket from '../../core/socket.js';
 import jwtService from '../../services/jwtService.js';
 import axios from 'axios';
+import { generateAccessToken, generateRefreshToken } from '../../utils/tokens.js';
+import { UserToken } from '../../models/userToken.js';
 
 class AccountController {
   constructor() {
     this.user = new User();
+    this.userTokenModel = new UserToken();
   }
 
 
@@ -40,12 +43,12 @@ class AccountController {
   async oauthGoogleCallback(req, res) {
     try {
       const code = req.query.code;
-      const state = req.query.state;
+      // const state = req.query.state;
 
-      if (!code) return res.status(400).json({ error: "Code missing in callback" });
+      if (!code) return res.redirect("http://localhost:5173/login?error=oauth_failed")
 
       // Decode role from state
-      const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
+      // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
 
       // Exchange code for access token
       const tokenRes = await axios.post(
@@ -71,57 +74,69 @@ class AccountController {
       const { sub: googleId, email, name, picture } = userInfoRes.data;
 
       // Find or create partial user with role
-      const { user, tempToken, needsOnboarding } = await this.findOrCreate({
+      const result = await this.findOrCreate({
         googleId,
         email,
         name,
         picture,
-        role
+        // role
       });
 
+      if (!result) return res.redirect("http://localhost:5173/login?error=not_registered");
+
+      const { user, role, tempToken, needsOnboarding} = result;
+
+      console.log("NEEEDSSS ON BOARDING:",needsOnboarding)
+
       if (needsOnboarding) {
+        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
+        return res.redirect(`http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`);
+
         // New user → redirect to onboarding page with tempToken
-        return res.json({
-          message: "Onboarding required",
-          tempToken,
-          user,
-        });
+        // return res.json({
+        //   message: "Onboarding required",
+        //   tempToken,
+        //   user,
+        // });
       }
 
       // Existing user → generate JWT
       const sessionToken = jwtService.sign({ id: user.id });
 
-      return res.json({
-        message: "Google login successful",
-        token: sessionToken,
-        user,
-      });
+      // return res.redirect("http://localhost:5173/home");
+      return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
+
 
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
-      return res.status(500).json({
-        error: "OAuth failed",
-        details: error.response?.data || error.message
-      });
+      return res.redirect("http://localhost:5173/login?error=oauth_failed");
     }
   }
 
 
-  async findOrCreate({ googleId, email, name, picture, role }) {
+  async findOrCreate({ googleId, email, name, picture }) {
     let user = await this.user.findByGoogleId(googleId);
     let tempToken = null;
     let needsOnboarding = false;
+    let role = null;
 
     if (!user) {
+
+      const {email: existingEmail, role: fetchRole} = await this.user.findByEmail(email);
+
+      console.log(existingEmail, fetchRole)
+
+      if (!existingEmail) return null
       // Create partial account and profile based on role
-      user = await this.user.createPartialGoogleUser({ googleId, email, name, picture, role });
+      user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail.email, name, picture });
 
       // Generate temporary token for onboarding (short-lived, e.g., 15m)
       tempToken = jwtService.sign({ id: user.id }, '15m');
       needsOnboarding = true;
+      role = fetchRole;
     }
 
-    return { user, tempToken, needsOnboarding };
+    return { user, role, tempToken, needsOnboarding };
   }
 
 
@@ -163,52 +178,58 @@ class AccountController {
    * @param {import('express').Response} res
    * @returns {void}
    */
+
   async login(req, res) {
     try {
       const { email, password } = req.body || {};
 
-      console.log(email, password)
-      const result = await this.user.verify(email, password);
-
-      if (!result?.account_id) {
-        return res.json({
-          success: false,
-          message: 'Invalid email or password',
-        });
+      if (!email || !password) {
+        return res.status(400).json({ success: false, message: "Email and password required" });
       }
 
+      // Verify user credentials
+      const user = await this.user.verify(email, password);
+
+      if (!user?.account_id) {
+        return res.status(401).json({ success: false, message: "Invalid email or password" });
+      }
+
+      const userId = user.account_id;
+
+      // Generate tokens
+      const accessToken = generateAccessToken(userId); // Implement your JWT access token function
+      const refreshToken = generateRefreshToken();     // Implement your JWT refresh token function
+
+      // Hash refresh token before storing
+      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+      // Save hashed refresh token in DB
+      const existing = await this.userTokenModel.findByUserId(userId);
+
+      if (existing) {
+        await this.userTokenModel.update(userId, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(userId, hashedRefresh);
+      }
+
+      // Optionally: emit a socket event for login
       const io = socket.getIO();
+      io.emit("user:login", { userId, email });
 
-      io.emit("user:login", { userId: result?.account_id, email: email})
-
-      console.log(
-        {
-          success: true,
-          data: {
-            token: jwt.sign({ 'email': email, 'account_id': result?.account_id }, process.env.API_SECRET_KEY, {
-              expiresIn: process.env.JWT_EXPIRES_IN || '90d',
-            }),
-          }
-        }
-      )
-
+      // Return tokens to client
       res.json({
         success: true,
         data: {
-          token: jwt.sign({ 'email': email, 'account_id': result?.account_id }, process.env.API_SECRET_KEY, {
-            expiresIn: process.env.JWT_EXPIRES_IN || '90d',
-          }),
-        }
+          accessToken,
+          refreshToken, // send the plain refresh token to client; store only hashed version
+        },
       });
-      res.end();
     } catch (err) {
-      res.json({
-        success: false,
-        message: err.toString(),
-      });
-      res.end()
+      console.error("Login error:", err);
+      res.status(500).json({ success: false, message: err.toString() });
     }
   }
+
 
   /**
    * Get user profile

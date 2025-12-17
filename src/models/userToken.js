@@ -16,12 +16,12 @@ export class UserToken {
     console.log(expiresAt)
 
     const [result] = await this.db.execute(
-      'INSERT INTO tokens (user_id, refresh_token, expires_at) VALUES (?, ?, ?)',
+      'INSERT INTO tokens (account_id, refresh_token, expires_at) VALUES (?, ?, ?)',
       [userId, hash, expiresAt]
     );
 
     return {
-      id: result.insertId,
+      token_id: result.insertId,
       userId,
       refreshTokenHash: hash,
       expiresAt,
@@ -31,7 +31,7 @@ export class UserToken {
 
   async findByUserId(userId) {
     const [rows] = await this.db.execute(
-        'SELECT * FROM tokens WHERE user_id = ? LIMIT 1',
+        'SELECT * FROM tokens WHERE account_id = ? LIMIT 1',
         [userId]
     );
     return rows[0] || null;
@@ -44,7 +44,7 @@ export class UserToken {
         `
         UPDATE tokens
         SET refresh_token = ?, expires_at = ?
-        WHERE user_id = ?
+        WHERE account_id = ?
         `,
         [hashedToken, expiresAt, userId]
     );
@@ -55,9 +55,9 @@ export class UserToken {
 
   // Find a valid refresh token by hash
   async findByHash(hash) {
-    console.log(hash)
+    // console.log(hash)
     const [rows] = await this.db.execute(
-      'SELECT * FROM tokens WHERE refresh_token = "GdSx4RNMhNFmI586YejCv5PFQJsYxExYA3eIZU_EzHI"'
+      'SELECT * FROM tokens WHERE refresh_token = ?', [hash]
     );
 
     console.log(rows)
@@ -65,8 +65,8 @@ export class UserToken {
     if (rows.length === 0) return null;
     const row = rows[0];
     return {
-      id: row.id,
-      userId: row.user_id,
+      token_id: row.token_id,
+      userId: row.account_id,
       refreshTokenHash: row.refresh_token,
       expiresAt: row.expires_at,
       createdAt: row.created_at
@@ -74,17 +74,17 @@ export class UserToken {
   }
 
   // Invalidate a token by ID (instead of deleting)
-  async invalidate(id) {
+  async invalidate(token_id) {
     await this.db.execute(
-      'UPDATE tokens SET refresh_token = NULL, expires_at = NOW() WHERE id = ?',
-      [id]
+      'UPDATE tokens SET refresh_token = NULL, expires_at = NOW() WHERE token_id = ?',
+      [token_id]
     );
   }
 
   // Invalidate all tokens for a user (logout)
   async invalidateByUserId(userId) {
     await this.db.execute(
-      'UPDATE tokens SET refresh_token = NULL, expires_at = NOW() WHERE user_id = ?',
+      'UPDATE tokens SET refresh_token = NULL, expires_at = NOW() WHERE account_id = ?',
       [userId]
     );
   }

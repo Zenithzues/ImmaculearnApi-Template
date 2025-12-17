@@ -39,23 +39,24 @@ export class AuthController {
     // console.log(refreshToken)
 
     const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const tokenRecord = await this.userTokenModel.findByHash(refreshToken);
+    const tokenRecord = await this.userTokenModel.findByHash(hash);
 
     console.log(tokenRecord)
 
     if (!tokenRecord) return res.status(403).json({ message: 'Invalid refresh token' });
     if (new Date(tokenRecord.expiresAt) < new Date()) {
-      await this.userTokenModel.invalidate(tokenRecord.id);
+      await this.userTokenModel.invalidate(tokenRecord.token_id);
       return res.status(403).json({ message: 'Refresh token expired' });
     }
 
     // Token rotation: invalidate old token
-    await this.userTokenModel.invalidate(tokenRecord.id);
+    // await this.userTokenModel.invalidate(tokenRecord.token_id);
 
     // Generate new tokens
     const newAccessToken = generateAccessToken(tokenRecord.userId);
     const newRefreshToken = generateRefreshToken();
-    await this.userTokenModel.create(tokenRecord.userId, newRefreshToken);
+    // await this.userTokenModel.create(tokenRecord.userId, newRefreshToken);
+    await this.userTokenModel.update(tokenRecord.userId, newRefreshToken)
 
     res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
   }

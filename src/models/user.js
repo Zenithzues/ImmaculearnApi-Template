@@ -1,4 +1,5 @@
 import { connection } from '../core/database.js';
+import { hashPassword, verifyPassword } from '../utils/argonUtil.js';
 import { encryptPassword } from '../utils/hash.js';
 
 class User {
@@ -6,16 +7,43 @@ class User {
     this.db = connection;
   }
 
-  async findOrCreate({ googleId, email, name, picture }) {
-    let user = await this.user.findByGoogleId(googleId);
-    if (!user) {
-      user = await this.user.createWithGoogle({ googleId, email, name, picture });
+  // async findOrCreate({ googleId, email, name, picture }) {
+  //   let user = await this.user.findByGoogleId(googleId);
+  //   if (!user) {
+  //     console.log("I NEED TO CREATE USING GOOGLE!!!!!")
+  //     user = await this.user.createWithGoogle({ googleId, email, name, picture });
+  //   }
+  //   return user;
+  // }
+
+  async findByEmail(email) {
+    // Check student emails first
+    const [studentResult] = await this.db.execute(
+      `SELECT email FROM registered_student_emails WHERE email = ?`,
+      [email]
+    );
+
+    if (studentResult.length > 0) {
+      return {email: studentResult[0], role: 'student'}; // Found in students
     }
-    return user;
+
+    // If not found, check professor emails
+    const [profResult] = await this.db.execute(
+      `SELECT email FROM registered_prof_emails WHERE email = ?`,
+      [email]
+    );
+
+    if (profResult.length > 0) {
+      return {email: profResult[0], role: 'professor'}; // Found in professors
+    }
+
+    // If not found in either table
+    return null;
   }
 
+
   async findByGoogleId(googleId) {
-    const query = 'SELECT * FROM accounts WHERE google_id = ? LIMIT 1';
+    const query = 'SELECT account_id, google_id FROM accounts WHERE google_id = ? LIMIT 1';
     const [rows] = await this.db.execute(query, [googleId]);
     return rows[0] || null;
   }
@@ -23,8 +51,8 @@ class User {
 
   async createPartialGoogleUser({ googleId, email, picture }) {
     const query =
-      'INSERT INTO accounts (google_id, email, created_at) VALUES (?, ?, NOW())';
-    const [result] = await this.db.execute(query, [googleId, email]);
+      'INSERT INTO accounts (account_id, email, google_id, profile_pic, created_at) VALUES (?, ?, ?, ?, NOW())';
+    const [result] = await this.db.execute(query, [1, email, googleId, picture]);
 
     return { id: result.insertId, googleId, email, picture };
   }
@@ -94,12 +122,34 @@ class User {
   async verify(email, password) {
     try {
       const [results,] = await connection.execute(
-        'SELECT account_id FROM accounts WHERE email = ? AND pswd = ?',
-        [email, encryptPassword(password)],
-      )
+        'SELECT account_id, email, password FROM accounts WHERE email = ?',
+        [email],
+      );
+
+      if (!results[0]) return null;
+
+      const storedHash = results[0].password;
+
+      console.log(storedHash)
+
+      console.log(await hashPassword(password))
+      const isValid = await verifyPassword(storedHash, password);
+
+      console.log(isValid)
+      if (!isValid) return null;
+
+      
 
       console.log(results?.[0])
-      return results?.[0];
+      // return results?.[0];
+
+      const user = results[0];
+      return {
+        account_id: user.account_id,
+        email: user.email,
+        // do NOT include user.password
+      };
+
     } catch (err) {
       console.error('<error> user.verify', err);
       throw err;

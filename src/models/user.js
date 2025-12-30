@@ -48,13 +48,29 @@ class User {
     return rows[0] || null;
   }
 
+  async findByAccountId(account_id, role) {
+    const finder = this.getFinder(role);
+    return finder.findByAccountId(account_id);
+  }
+
+  getFinder(role) {
+    switch (role) {
+      case 'student':
+        return new StudentFinder(this.db);
+      case 'professor':
+        return new ProfessorFinder(this.db);
+      default:
+        throw new Error(`Unsupported role: ${role}`);
+    }
+  }
+
 
   async createPartialGoogleUser({ googleId, email, picture }) {
     const query =
-      'INSERT INTO accounts (account_id, email, google_id, profile_pic, created_at) VALUES (?, ?, ?, ?, NOW())';
-    const [result] = await this.db.execute(query, [1, email, googleId, picture]);
+      'INSERT INTO accounts (email, google_id, profile_pic, created_at) VALUES (?, ?, ?, NOW())';
+    const [result] = await this.db.execute(query, [email, googleId, picture]);
 
-    return { id: result.insertId, googleId, email, picture };
+    return { account_id: result.insertId, googleId, email, picture };
   }
 
   async completeStudentOnboarding(userId, data) {
@@ -189,6 +205,62 @@ class User {
     }
   }
 }
+
+
+
+
+class StudentFinder {
+  constructor(db) {
+    this.db = db;
+  }
+
+  async findByAccountId(account_id) {
+    const query = `
+      SELECT 
+        acc.account_id,
+        acc.profile_pic,
+        CONCAT(st.student_fn, ' ', st.student_ln) AS full_name,
+        st.student_bd AS birth_date,
+        st.student_gender AS gender,
+        st.student_course AS course,
+        st.student_yr_lvl AS year_level
+      FROM accounts AS acc
+      LEFT JOIN students AS st ON st.account_id = acc.account_id
+      WHERE acc.account_id = ?
+      LIMIT 1
+    `;
+    
+    const [rows] = await this.db.execute(query, [account_id]);
+    return rows[0] || null;
+  }
+}
+
+class ProfessorFinder {
+  constructor(db) {
+    this.db = db;
+  }
+
+  async findByAccountId(account_id) {
+    const query = `
+      SELECT 
+        acc.account_id,
+        acc.profile_pic,
+        CONCAT(pr.prof_fn, ' ', pr.prof_ln) AS full_name,
+        pr.prof_bd AS birth_date,
+        pr.prof_gender AS gender,
+        pr.prof_department AS department
+      FROM accounts AS acc
+      LEFT JOIN professors AS pr ON pr.account_id = acc.account_id
+      WHERE acc.account_id = ?
+      LIMIT 1
+    `;
+    
+    const [rows] = await this.db.execute(query, [account_id]);
+    return rows[0] || null;
+  }
+}
+
+
 
 export default User;
 

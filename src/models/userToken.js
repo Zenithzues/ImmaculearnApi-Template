@@ -7,23 +7,23 @@ export class UserToken {
   }
 
   // Create a new refresh token and store in DB
-  async create(userId, refreshToken) {
-    console.log(refreshToken)
-    console.log(userId)
-    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  async create(userId, hashedRefresh) {
+    // console.log(refreshToken)
+    // console.log(userId)
+    // const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
 
     console.log(expiresAt)
 
     const [result] = await this.db.execute(
       'INSERT INTO tokens (account_id, refresh_token, expires_at) VALUES (?, ?, ?)',
-      [userId, hash, expiresAt]
+      [userId, hashedRefresh, expiresAt]
     );
 
     return {
       token_id: result.insertId,
       userId,
-      refreshTokenHash: hash,
+      refreshTokenHash: hashedRefresh,
       expiresAt,
       createdAt: new Date()
     };
@@ -37,8 +37,8 @@ export class UserToken {
     return rows[0] || null;
   }
 
-  async update(userId, refreshToken) {
-    const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  async update(userId, hashedRefresh) {
+    // const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
     return await this.db.query(
         `
@@ -46,7 +46,7 @@ export class UserToken {
         SET refresh_token = ?, expires_at = ?
         WHERE account_id = ?
         `,
-        [hashedToken, expiresAt, userId]
+        [hashedRefresh, expiresAt, userId]
     );
   }
 
@@ -54,13 +54,12 @@ export class UserToken {
 
 
   // Find a valid refresh token by hash
-  async findByHash(hash) {
-    // console.log(hash)
+  async findByRefresh(refreshToken) {
     const [rows] = await this.db.execute(
-      'SELECT * FROM tokens WHERE refresh_token = ?', [hash]
+      'SELECT * FROM tokens WHERE refresh_token = ?', [refreshToken]
     );
 
-    console.log(rows)
+    // console.log(rows)
 
     if (rows.length === 0) return null;
     const row = rows[0];

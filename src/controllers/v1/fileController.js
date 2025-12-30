@@ -1,4 +1,4 @@
-import { storageService } from '../../models/fileModel.js';
+// import { storageService } from '../../models/fileModel.js';
 
 class FileController {
   // Upload a file
@@ -12,7 +12,7 @@ class FileController {
         const userId = req.body.userId || 'guest';
         const destinationPath = `documents/${userId}/${req.file.originalname}`;
 
-        await storageService.uploadFile(req.file.buffer, destinationPath);
+        // await storageService.uploadFile(req.file.buffer, destinationPath);
 
         console.log("UPLOAD OK:", destinationPath);
 
@@ -30,9 +30,9 @@ class FileController {
       const { filePath } = req.body;
       if (!filePath) return res.status(400).json({ message: 'filePath is required' });
 
-      const url = await storageService.getFileSignedUrl(filePath);
+      // const url = await storageService.getFileSignedUrl(filePath);
 
-      res.status(200).json({ url });
+      // res.status(200).json({ url });
     } catch (error) {
       res.status(500).json({ message: 'Failed to get file', error: error.message });
     }
@@ -44,7 +44,7 @@ class FileController {
       const { filePath } = req.body;
       if (!filePath) return res.status(400).json({ message: 'filePath is required' });
 
-      await storageService.deleteFile(filePath);
+      // await storageService.deleteFile(filePath);
 
       res.status(200).json({ message: 'File deleted successfully' });
     } catch (error) {

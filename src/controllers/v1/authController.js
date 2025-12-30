@@ -1,79 +1,487 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { generateAccessToken, generateRefreshToken } from '../../utils/tokens.js';
-import { UserToken } from '../../models/userToken.js';
+import { generateAccessToken } from '../../utils/tokens.js';
+import { UserToken } from '../../models/MySQL/UserToken.js';
+// import User from '../../models/MySQL/UserModel.js';
+import { Logger } from '../../utils/Logger.js';
+import { hybridDatabase } from '../../core/HybridDatabase.js';
+import { Validator } from '../../utils/Validator.js';
+import User from '../../models/MySQL/UserModel.js';
 
 export class AuthController {
   constructor() {
-    this.userTokenModel = new UserToken(); // instance of UserToken
+    this.logger = new Logger('AuthController');
+    this.userTokenModel = new UserToken();
+    this.user = new User();
   }
 
-  // Login method
-  async login(req, res) {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ message: "User ID required" });
-
-    const accessToken = generateAccessToken(userId);
-    const refreshToken = generateRefreshToken();
-    const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
-
-    const existing = await this.userTokenModel.findByUserId(userId);
-
-    if (existing) {
-        // Update existing token record
-        await this.userTokenModel.update(userId, hashedRefresh);
-    } else {
-        // Create a new token record
-        await this.userTokenModel.create(userId, refreshToken);
-    }
-
-    res.json({ accessToken, refreshToken });
-    }
-
-
-  // Refresh token method
-  async refresh(req, res) {
-    const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ message: 'Refresh token required' });
-
-    // console.log(refreshToken)
-
-    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const tokenRecord = await this.userTokenModel.findByHash(hash);
-
-    console.log(tokenRecord)
-
-    if (!tokenRecord) return res.status(403).json({ message: 'Invalid refresh token' });
-    if (new Date(tokenRecord.expiresAt) < new Date()) {
-      await this.userTokenModel.invalidate(tokenRecord.token_id);
-      return res.status(403).json({ message: 'Refresh token expired' });
-    }
-
-    // Token rotation: invalidate old token
-    // await this.userTokenModel.invalidate(tokenRecord.token_id);
-
-    // Generate new tokens
-    const newAccessToken = generateAccessToken(tokenRecord.userId);
-    const newRefreshToken = generateRefreshToken();
-    // await this.userTokenModel.create(tokenRecord.userId, newRefreshToken);
-    await this.userTokenModel.update(tokenRecord.userId, newRefreshToken)
-
-    res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
-  }
-
-  // Protected route example
-  protectedRoute(req, res) {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) return res.sendStatus(401);
-
-    const token = authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
-
+  async profile(req, res) {
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      res.json({ message: `Hello user ${payload.userId}` });
-    } catch {
-      res.status(403).json({ message: 'Invalid or expired access token' });
+      const token = req.cookies.accessToken || 
+                    req.headers.authorization?.replace('Bearer ', '');
+      
+      this.logger.debug('Profile request', { hasToken: !!token });
+
+      if (!token) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Not authenticated' 
+        });
+      }
+
+      let payload;
+      try {
+        payload = jwt.verify(token, process.env.JWT_SECRET);
+        this.logger.debug('Token verified', { userId: payload.userId, role: payload.role });
+      } catch (err) {
+        this.logger.warn('Invalid token', { error: err.message });
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid or expired token' 
+        });
+      }
+
+      console.log("Hello world!!!!")
+
+      const user = await this.user.findByAccountId(payload.userId, payload.role);
+      
+      if (!user) {
+        this.logger.warn('User not found for profile', { userId: payload.userId, role: payload.role });
+        return res.status(404).json({ 
+          success: false, 
+          message: 'User not found' 
+        });
+      }
+
+      // Update user status to online
+      await this.user.updateUserStatus(payload.userId, 'online');
+
+      // Sync user to Supabase for collaboration features
+      await hybridDatabase.syncUserToSupabase(payload.userId.toString());
+
+      const profileData = {
+        id: user.account_id,
+        email: user.email,
+        profile_pic: user.profile_pic,
+        name: user.full_name,
+        bd: user.birth_date,
+        gender: user.gender,
+        role: payload.role
+      };
+
+      // Add role-specific fields
+      if (payload.role === "student") {
+        profileData.course = user.course;
+        profileData.yr_lvl = user.year_level;
+      } else {
+        profileData.department = user.department;
+      }
+
+      this.logger.info('Profile retrieved', { userId: payload.userId, role: payload.role });
+
+      res.json({
+        success: true,
+        data: profileData
+      });
+
+    } catch (err) {
+      this.logger.error('Profile error', { error: err.message, stack: err.stack });
+      res.status(500).json({ 
+        success: false, 
+        message: 'Server error' 
+      });
+    }
+  }
+
+  async login(req, res) {
+    const timer = this.logger.startTimer('login');
+    
+    try {
+      const { email, password } = req.body;
+      
+      this.logger.info('Login attempt', { email, ip: req.ip });
+
+      if (!email || !password) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email and password are required' 
+        });
+      }
+
+      // 1. Check if email is registered
+      const emailCheck = await this.user.findByEmail(email);
+      if (!emailCheck) {
+        this.logger.warn('Email not registered', { email });
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Email not registered as student or professor' 
+        });
+      }
+
+      // 2. Validate Gmail requirement
+      const emailValidation = Validator.validateEmailWithFeedback(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: emailValidation.message
+        });
+      }
+
+      // 3. Verify credentials
+      const user = await this.user.verify(email, password);
+      if (!user) {
+        this.logger.warn('Invalid credentials', { email });
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid credentials' 
+        });
+      }
+
+      // 4. Update user status to online
+      await this.user.updateUserStatus(user.account_id, 'online');
+
+      // 5. Sync user to Supabase
+      await hybridDatabase.syncUserToSupabase(user.account_id.toString());
+
+      // 6. Generate tokens
+      const accessToken = generateAccessToken(user.account_id, emailCheck.role);
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      // 7. Store or update refresh token
+      const existing = await this.userTokenModel.findByUserId(user.account_id);
+      if (existing) {
+        await this.userTokenModel.update(user.account_id, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(user.account_id, hashedRefresh);
+      }
+
+      // 8. Set cookies
+      res.cookie('accessToken', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 15 * 60 * 1000, // 15 minutes
+      });
+
+      res.cookie('refreshToken', JSON.stringify({ 
+        refreshToken, 
+        role: emailCheck.role 
+      }), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      this.logger.userActivity(user.account_id, 'login', {
+        success: true,
+        ip: req.ip,
+        role: emailCheck.role,
+        userAgent: req.headers['user-agent']
+      });
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          account_id: user.account_id,
+          email: user.email,
+          role: emailCheck.role
+        }
+      });
+
+    } catch (err) {
+      this.logger.logError(err, {
+        operation: 'login',
+        email: req.body?.email,
+        ip: req.ip
+      });
+
+      res.status(500).json({ 
+        success: false, 
+        message: 'Login failed' 
+      });
+    } finally {
+      timer.end();
+    }
+  }
+
+  async refresh(req, res) {
+    try {
+      const cookieVal = req.cookies.refreshToken && JSON.parse(req.cookies.refreshToken);
+
+      if (!cookieVal) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Refresh token not found' 
+        });
+      }
+
+      const { refreshToken, role } = cookieVal;
+      
+      this.logger.debug('Refresh token attempt', { hasToken: !!refreshToken });
+
+      if (!refreshToken) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Refresh token required' 
+        });
+      }
+
+
+      // Hash the incoming refresh token
+      const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      // Find token in database
+      const userTokenRecord = await this.userTokenModel.findByRefresh(hashedRefresh);
+      
+      if (!userTokenRecord) {
+        this.logger.warn('Invalid refresh token');
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid refresh token' 
+        });
+      }
+
+      // Check if refresh token is expired
+      if (new Date(userTokenRecord.expires_at) < new Date()) {
+        await this.userTokenModel.invalidate(userTokenRecord.token_id);
+        this.logger.warn('Refresh token expired', { token_id: userTokenRecord.token_id });
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Refresh token expired' 
+        });
+      }
+
+      // Generate new access token
+      const newAccessToken = generateAccessToken(userTokenRecord.account_id, role);
+
+      // Update user status
+      await this.user.updateUserStatus(userTokenRecord.account_id, 'online');
+
+      // Set new access token cookie
+      res.cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 15 * 60 * 1000, // 15 minutes
+      });
+
+      this.logger.debug('Token refreshed', { account_id: userTokenRecord.account_id });
+
+      res.json({ 
+        success: true,
+        message: 'Token refreshed successfully'
+      });
+      
+    } catch (err) {
+      this.logger.error('Refresh error', { error: err.message });
+      res.status(500).json({ 
+        success: false, 
+        message: 'Server error' 
+      });
+    }
+  }
+
+  async logout(req, res) {
+    try {
+      const userId = req.user?.account_id;
+      const token = req.cookies.accessToken;
+      
+      if (userId) {
+        // Invalidate all tokens for user
+        await this.userTokenModel.invalidateByUserId(userId);
+        
+        // Update status to offline
+        await this.user.updateUserStatus(userId, 'offline');
+        
+        this.logger.userActivity(userId, 'logout', {
+          success: true,
+          ip: req.ip
+        });
+      }
+
+      // Clear cookies
+      res.clearCookie('accessToken');
+      res.clearCookie('refreshToken');
+
+      res.json({
+        success: true,
+        message: 'Logged out successfully'
+      });
+
+    } catch (err) {
+      this.logger.error('Logout failed', { error: err.message });
+      res.status(500).json({
+        success: false,
+        message: 'Logout failed'
+      });
+    }
+  }
+
+  async protectedRoute(req, res) {
+    try {
+      const authHeader = req.headers['authorization'];
+      
+      if (!authHeader) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'No authorization header' 
+        });
+      }
+
+      const token = authHeader.split(' ')[1];
+      
+      if (!token) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'No token provided' 
+        });
+      }
+
+      try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        
+        this.logger.debug('Protected route accessed', { 
+          userId: payload.userId, 
+          endpoint: req.originalUrl 
+        });
+
+        res.json({ 
+          success: true,
+          message: `Hello user ${payload.userId}`,
+          userId: payload.userId,
+          role: payload.role
+        });
+      } catch (err) {
+        this.logger.warn('Invalid token in protected route', { error: err.message });
+        res.status(403).json({ 
+          success: false,
+          message: 'Invalid or expired access token' 
+        });
+      }
+    } catch (err) {
+      this.logger.error('Protected route error', { error: err.message });
+      res.status(500).json({ 
+        success: false,
+        message: 'Server error' 
+      });
+    }
+  }
+
+  async register(req, res) {
+    const timer = this.logger.startTimer('register');
+    
+    try {
+      const { email, password } = req.body;
+      
+      this.logger.info('Registration attempt', { email, ip: req.ip });
+
+      if (!email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email and password are required'
+        });
+      }
+
+      // 1. Check if email is registered in student/professor tables
+      const emailCheck = await this.user.findByEmail(email);
+      if (!emailCheck) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email not registered as student or professor'
+        });
+      }
+
+      // 2. Validate Gmail requirement
+      const emailValidation = Validator.validateEmailWithFeedback(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: emailValidation.message
+        });
+      }
+
+      // 3. Validate password
+      if (!Validator.validatePassword(password)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+        });
+      }
+
+      // 4. Create user account
+      const result = await this.user.create(email, password);
+      const accountId = result.insertId;
+
+      // 5. Sync user to Supabase
+      await hybridDatabase.syncUserToSupabase(accountId.toString());
+      
+      // 6. Generate tokens
+      const accessToken = generateAccessToken(accountId, emailCheck.role);
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      // 7. Store refresh token
+      await this.userTokenModel.create(accountId, hashedRefresh);
+
+      // 8. Set cookies
+      res.cookie('accessToken', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.cookie('refreshToken', JSON.stringify({ 
+        refreshToken, 
+        role: emailCheck.role 
+      }), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      this.logger.userActivity(accountId, 'register', {
+        success: true,
+        ip: req.ip,
+        role: emailCheck.role,
+        userAgent: req.headers['user-agent']
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Registration successful',
+        data: {
+          account_id: accountId,
+          email: email,
+          role: emailCheck.role
+        }
+      });
+
+    } catch (error) {
+      this.logger.logError(error, {
+        operation: 'register',
+        email: req.body?.email,
+        ip: req.ip
+      });
+
+      // Handle duplicate email error
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already registered'
+        });
+      }
+
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Registration failed'
+      });
+    } finally {
+      timer.end();
     }
   }
 }

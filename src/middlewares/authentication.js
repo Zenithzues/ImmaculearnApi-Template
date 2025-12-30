@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config.js';
 
 /**
  * Authentication for logged in users
@@ -7,30 +8,28 @@ import jwt from 'jsonwebtoken';
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next 
  */
-export default function authorization(req, res, next) {
-  const token = req.headers.token;
+export default function authentication(req, res, next) {
+  const token = req.cookies.accessToken;
 
   if (!token) {
-    res.json({
+    return res.json({
       'success': false,
       'message': 'Unauthenticated user',
     });
-    return;
   }
 
-  jwt.verify(token, process.env.API_SECRET_KEY, (err, decoded) => {
-    if (err) {
-      res.json({
-        'success': false,
-        'message': 'Invalid token',
-      });
-      return;
-    }
-
-    res.locals.account_id = decoded?.account_id;
+  try {
+    // Use synchronous verify instead of callback
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    res.locals.account_id = decoded.userId;
     res.locals.authenticated = true;
     next();
-  });
-
+  } catch (err) {
+    // Token verification failed (expired or invalid)
+    return res.status(401).json({
+      'success': false,
+      'message': 'Invalid or expired token',
+    });
+  }
 }
-

@@ -9,6 +9,8 @@ const authController = new AuthController();
 
 authRouter.use(authorization);
 
+authRouter.get('/profile', authentication, authController.profile.bind(authController));
+
 authRouter.post('/login', authController.login.bind(authController));
 authRouter.post('/refresh', authController.refresh.bind(authController));
 authRouter.get('/protected', authController.protectedRoute.bind(authController));

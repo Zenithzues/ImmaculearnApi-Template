@@ -19,7 +19,7 @@ app.use(morgan('combined'));
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use('/v1', cors(), v1);
+app.use('/v1', cors( {origin: "http://localhost:5173", credentials: true} ), v1);
 
 const server = http.createServer(app);
 socket.init(server);

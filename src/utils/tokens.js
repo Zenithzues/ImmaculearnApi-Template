@@ -7,8 +7,8 @@ import { JWT_SECRET, ACCESS_TOKEN_EXPIRES } from '../config.js';
  * @param {number|string} userId
  * @returns {string} JWT token
  */
-export function generateAccessToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
+export function generateAccessToken(userId, role) {
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
 }
 
 /**

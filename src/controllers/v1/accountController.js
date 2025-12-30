@@ -1,10 +1,12 @@
 import crypto from 'crypto'
-import User from '../../models/user.js';
+// import User from '../../models/user.js';
 import socket from '../../core/socket.js';
 import jwtService from '../../services/jwtService.js';
 import axios from 'axios';
 import { generateAccessToken, generateRefreshToken } from '../../utils/tokens.js';
-import { UserToken } from '../../models/userToken.js';
+// import { UserToken } from '../../models/userToken.js';
+import { UserToken } from '../../models/MySQL/UserToken.js';
+import User from '../../models/MySQL/UserModel.js';
 
 class AccountController {
   constructor() {
@@ -45,7 +47,7 @@ class AccountController {
       const code = req.query.code;
       // const state = req.query.state;
 
-      if (!code) return res.redirect("http://localhost:5173/login?error=oauth_failed")
+      if (!code) return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed")
 
       // Decode role from state
       // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
@@ -82,7 +84,7 @@ class AccountController {
         // role
       });
 
-      if (!result) return res.redirect("http://localhost:5173/login?error=not_registered");
+      if (!result) return res.redirect("http://localhost:5173/oauth/callback?error=not_registered");
 
       const { user, role, tempToken, needsOnboarding} = result;
 
@@ -100,8 +102,44 @@ class AccountController {
         // });
       }
 
+      // Existing user → generate access & refresh tokens
+      const accessToken = generateAccessToken(user.account_id, role);
+      const refreshToken = generateRefreshToken();
+
+      console.log("REFRESH TOKEN GENERATED: ", refreshToken)
+
+      // Hash refresh token before storing in DB
+      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const existingToken = await this.userTokenModel.findByUserId(user.account_id);
+
+      console.log(existingToken)
+
+      if (existingToken) {
+        await this.userTokenModel.update(user.account_id, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(user.account_id, hashedRefresh);
+      }
+
+      
+      if (user) {
+          // Set tokens in HTTP-only cookies
+          res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "Strict",
+            maxAge: 15 * 60 * 1000, // 15 minutes
+          });
+    
+          res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "Strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          });
+      }
+
       // Existing user → generate JWT
-      const sessionToken = jwtService.sign({ id: user.id });
+      // const sessionToken = jwtService.sign({ id: user.id });
 
       // return res.redirect("http://localhost:5173/home");
       return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
@@ -109,24 +147,35 @@ class AccountController {
 
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
-      return res.redirect("http://localhost:5173/login?error=oauth_failed");
+      return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed");
     }
   }
 
 
   async findOrCreate({ googleId, email, name, picture }) {
-    let user = await this.user.findByGoogleId(googleId);
+    let user = await this.user.findByEmail(email);
+
+    if (!user) return null
+    
+    let role = user.role;
     let tempToken = null;
     let needsOnboarding = false;
-    let role = null;
+
+    user = await this.user.findByGoogleId(googleId);
 
     if (!user) {
 
-      const {email: existingEmail, role: fetchRole} = await this.user.findByEmail(email);
 
-      console.log(existingEmail, fetchRole)
 
-      if (!existingEmail) return null
+      const results = await this.user.findByEmail(email);
+
+      if (!results) return null
+
+
+      const {email: existingEmail, role: fetchRole} = results;
+      // console.log(existingEmail, fetchRole)
+
+      // if (!existingEmail) return 
       // Create partial account and profile based on role
       user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail.email, name, picture });
 
@@ -138,6 +187,74 @@ class AccountController {
 
     return { user, role, tempToken, needsOnboarding };
   }
+
+
+  async create_space(req, res) {
+    try {
+      const {space_name, space_description} = req.body || {};
+      const account_id = req.params.account_id || null
+
+      const result = await this.user.createSpace(account_id, space_name, space_description)
+
+      // if (!result) res.json({ success: false, message: "Failed to create Space!"})
+
+
+      res.json({
+        success: true,
+        message: "Creating Space Successfully!",
+        space_id: result.insertId,
+      })
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+  async get_space_by_id(req, res) {
+    try {
+      // const {space_name, space_description} = req.body || {};
+      const {space_id} = req.params || {}
+      // const space_id = req.query.space_id
+
+      const result = await this.user.getBySpaceId(space_id);
+
+      if (result.length === 0) return res.json({success: true, message: "Can't find space"})
+
+      res.json({
+        success: true,
+        data: {
+          space: {
+            space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
+            space_name: result.space_name,
+            space_description: result.description
+          }
+        }
+        // space_id: space_id,
+        // account_id: account_id
+      })
+      
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+
+
+
+
+
+
+
+
 
 
   /**
@@ -197,7 +314,7 @@ class AccountController {
       const userId = user.account_id;
 
       // Generate tokens
-      const accessToken = generateAccessToken(userId); // Implement your JWT access token function
+      const accessToken = generateAccessToken(userId, role); // Implement your JWT access token function
       const refreshToken = generateRefreshToken();     // Implement your JWT refresh token function
 
       // Hash refresh token before storing

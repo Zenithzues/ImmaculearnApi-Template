@@ -15,9 +15,6 @@ class SpaceController {
       const {space_name, space_description=""} = req.body || {};
 
       console.log(space_name, space_description)
-    //   const
-
-    //   const account_id = req.params.account_id || null
 
       const result = await this.space.createSpace(res.locals.account_id, space_name, space_description)
 

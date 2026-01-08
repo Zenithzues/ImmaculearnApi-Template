@@ -65,7 +65,8 @@ export class ChatController {
   
   async sendMessage(req, res) {
     try {
-      const { roomId, content, type = 'text' } = req.body;
+      const { content, type = 'text' } = req.body || {};
+      const { roomId } = req.params || {}
       const userId = '1';
       
       this.logger.debug('Sending message', { roomId, userId, contentLength: content?.length });
@@ -140,6 +141,8 @@ export class ChatController {
         .eq('deleted', false)
         .order('created_at', { ascending: false })
         .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+      console.log(messages)
       
       if (error) {
         this.logger.error('Failed to get messages:', error);

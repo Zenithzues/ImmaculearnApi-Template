@@ -108,7 +108,13 @@ class AccountController {
 
       console.log("REFRESH TOKEN GENERATED: ", refreshToken)
 
+      // const { account_id, googleId: google_id} = user;
+
       // Hash refresh token before storing in DB
+
+      // console.log(account_id, google_id)
+
+      console.log(user)
       const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
       const existingToken = await this.userTokenModel.findByUserId(user.account_id);
 
@@ -155,6 +161,8 @@ class AccountController {
   async findOrCreate({ googleId, email, name, picture }) {
     let user = await this.user.findByEmail(email);
 
+
+    console.log(user)
     if (!user) return null
     
     let role = user.role;
@@ -162,6 +170,8 @@ class AccountController {
     let needsOnboarding = false;
 
     user = await this.user.findByGoogleId(googleId);
+
+    console.log(user)
 
     if (!user) {
 
@@ -171,13 +181,15 @@ class AccountController {
 
       if (!results) return null
 
+      console.log(results)
+
 
       const {email: existingEmail, role: fetchRole} = results;
       // console.log(existingEmail, fetchRole)
 
       // if (!existingEmail) return 
       // Create partial account and profile based on role
-      user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail.email, name, picture });
+      user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail, name, picture });
 
       // Generate temporary token for onboarding (short-lived, e.g., 15m)
       tempToken = jwtService.sign({ id: user.id }, '15m');
@@ -202,7 +214,7 @@ class AccountController {
       res.json({
         success: true,
         message: "Creating Space Successfully!",
-        space_id: result.insertId,
+        space_uuid: result.space_uuid,
       })
 
     } catch(err) {

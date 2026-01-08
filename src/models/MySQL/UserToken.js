@@ -17,10 +17,12 @@ export class UserToken {
       
       this.logger.debug('Creating user token', { userId, expiresAt });
 
-      const [result] = await this.db.execute(
-        'INSERT INTO tokens (account_id, refresh_token, expires_at) VALUES (?, ?, ?)',
+      const result = await this.db.execute(
+        'INSERT INTO tokens (account_id, refresh_token, expires_at, created_at) VALUES (?, ?, ?, NOW())',
         [userId, hashedRefresh, expiresAt]
       );
+
+      console.log(result)
 
       this.logger.info('User token created', { userId, token_id: result.insertId });
       
@@ -44,11 +46,11 @@ export class UserToken {
         [userId]
       );
       
-      if (rows[0]) {
+      if (rows) {
         this.logger.debug('Found token by user ID', { userId });
       }
       
-      return rows[0] || null;
+      return rows || null;
     } catch (error) {
       this.logger.error('Error finding token by user ID', { userId, error });
       throw error;
@@ -58,8 +60,8 @@ export class UserToken {
   async update(userId, hashedRefresh) {
     try {
       const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
-      
-      const [result] = await this.db.execute(
+      console.log(hashedRefresh, userId)
+      const result = await this.db.execute(
         `UPDATE tokens SET refresh_token = ?, expires_at = ? WHERE account_id = ?`,
         [hashedRefresh, expiresAt, userId]
       );

@@ -354,9 +354,9 @@ export class HybridDatabase {
     };
   }
 
-  async syncUserToSupabase(userId) {
+  async syncUserToSupabase(userId, role) {
     try {
-        console.log("Starting syncUserToSupabase for user:", userId);
+        console.log("Starting syncUserToSupabase for user:", userId, role);
         
         if (!this.supabase || !this.supabase.isConnected) {
         this.logger.debug('Supabase not connected, skipping user sync');
@@ -376,14 +376,14 @@ export class HybridDatabase {
         const userModel = new User();
         
         // Get user data from MySQL
-        const user = await userModel.syncToSupabase(userId);
+        const user = await userModel.syncToSupabase(userId, role);
         
         if (!user) {
         this.logger.warn('User not found in MySQL for Supabase sync', { userId });
         return false;
         }
 
-        console.log("User data from MySQL:", JSON.stringify(user, null, 2));
+        // console.log("User data from MySQL:", JSON.stringify(user, null, 2));
 
         // Generate a deterministic UUID from the numeric ID
         // This ensures the same MySQL user always maps to the same UUID in Supabase
@@ -408,7 +408,7 @@ export class HybridDatabase {
 
         // Prepare the data for upsert
         const userData = {
-        id: supabaseUserId, // Use UUID instead of string "1"
+        id: user.id, // Use UUID instead of string "1"
         email: user.email || '',
         username: user.username || user.email?.split('@')[0] || 'user',
         role: user.role || 'user',
@@ -419,7 +419,7 @@ export class HybridDatabase {
         updated_at: new Date().toISOString()
         };
 
-        console.log("Prepared user data for Supabase:", JSON.stringify(userData, null, 2));
+        // console.log("Prepared user data for Supabase:", JSON.stringify(userData, null, 2));
 
         // Try to insert/update the user
         const { data, error } = await supabaseClient
@@ -430,7 +430,7 @@ export class HybridDatabase {
         })
         .select();
 
-        console.log("Upsert result:", { data, error });
+        // console.log("Upsert result:", { data, error });
         
         if (error) {
         console.error('Supabase upsert error:', error);

@@ -11,32 +11,35 @@ class User {
 
   async findByEmail(email) {
     try {
-      this.logger.debug('Finding user by email', { email });
+    //   this.logger.debug('Finding user by email', { email });
       
       // Check student emails first
-      const [studentResult] = await this.db.execute(
+      const studentResult = await this.db.query(
         `SELECT email FROM registered_student_emails WHERE email = ?`,
         [email]
       );
 
-      if (studentResult.length > 0) {
-        this.logger.debug('Found student email', { email });
+    //   console.log(!studentResult || "No student Result found");
+
+      if (studentResult && studentResult.length > 0) {
+        // this.logger.debug('Found student email', { email });
         return {email: studentResult[0].email, role: 'student'};
       }
 
       // If not found, check professor emails
-      const [profResult] = await this.db.execute(
+      const profResult = await this.db.query(
         `SELECT email FROM registered_prof_emails WHERE email = ?`,
         [email]
       );
+    //   console.log(!profResult || "No student Result found");
 
-      if (profResult.length > 0) {
-        this.logger.debug('Found professor email', { email });
+      if (profResult && profResult.length > 0) {
+        // this.logger.debug('Found professor email', { email });
         return {email: profResult[0].email, role: 'professor'};
       }
 
       // If not found in either table
-      this.logger.debug('Email not found in registered lists', { email });
+      this.logger.error('Email not found in registered lists', { email });
       return null;
     } catch (error) {
       this.logger.error('Error finding user by email', { email, error });
@@ -48,17 +51,20 @@ class User {
     try {
       const query = 'SELECT account_id, google_id FROM accounts WHERE google_id = ? LIMIT 1';
       const [rows] = await this.db.execute(query, [googleId]);
+
+    //   console.log(rows)
       
-      if (rows[0]) {
-        this.logger.debug('Found user by Google ID', { googleId });
-      }
+    //   if (!rows) {
+    //     this.logger.error('User not found by Google ID', { googleId });
+    //   }
       
-      return rows[0] || null;
+      return rows || null;
     } catch (error) {
       this.logger.error('Error finding user by Google ID', { googleId, error });
       throw error;
     }
   }
+  
 
   async findByAccountId(account_id, role) {
     try {
@@ -66,9 +72,9 @@ class User {
       const finder = this.getFinder(role);
       const user = await finder.findByAccountId(account_id);
       
-      if (user) {
-        this.logger.debug('Found user by account ID', { account_id, role });
-      }
+    //   if (!user) {
+    //     this.logger.error(' User not found by account ID', { account_id, role });
+    //   }
       
       return user;
     } catch (error) {
@@ -111,7 +117,7 @@ class User {
     
     try {
       await conn.beginTransaction();
-      this.logger.debug('Starting student onboarding transaction', { userId });
+    //   this.logger.debug('Starting student onboarding transaction', { userId });
 
       // 1️⃣ Update accounts table (store password)
       const hashedPassword = encryptPassword(password);
@@ -163,9 +169,17 @@ class User {
       const query = `INSERT INTO spaces (space_uuid, space_name, description, created_by, created_at) VALUES (UUID(), ?, ?, ?, NOW())`;
       const result = await this.db.execute(query, [space_name, space_description, account_id]);
 
+      const [row] = await this.db.execute(
+            'SELECT space_uuid FROM spaces WHERE space_id = ?',
+            [result.insertId]
+        );
     //   this.logger.info('Created Space', { space_name, space_description, account_id });
       
-      return result;
+      return { 
+            success: true, 
+            space_uuid: row.space_uuid,
+            insertId: result.insertId 
+        };
     } catch (error) {
       this.logger.error('Error creating Space', { space_name, space_description, error });
       throw error;
@@ -207,7 +221,7 @@ class User {
 
   async verify(email, password) {
     try {
-      this.logger.debug('Verifying user credentials', { email });
+    //   this.logger.debug('Verifying user credentials', { email });
       
       const [results] = await this.db.execute(
         'SELECT account_id, email, pswd as password FROM accounts WHERE email = ?',
@@ -265,13 +279,31 @@ class User {
         [account_id]
       );
 
-      if (results[0]) {
-        this.logger.debug('Retrieved user info', { account_id });
-      }
+    //   if (results[0]) {
+    //     this.logger.debug('Retrieved user info', { account_id });
+    //   }
       
       return results[0] || null;
     } catch (err) {
       this.logger.error('Error getting user info', { account_id, error: err });
+      throw err;
+    }
+  }
+
+  async getUserStatus(account_id) {
+    try {
+        const status = await this.db.execute(
+            `
+            SELECT status 
+            FROM accounts
+            WHERE account_id = ?
+            `, [account_id]
+        )
+
+        // this.logger.debug('Get User status', { account_id, status });
+        return status
+    } catch(err) {
+      this.logger.error('Error getting user status', { account_id, err });
       throw err;
     }
   }
@@ -283,7 +315,7 @@ class User {
         [status, account_id]
       );
       
-      this.logger.debug('Updated user status', { account_id, status });
+    //   this.logger.debug('Updated user status', { account_id, status });
     } catch (error) {
       this.logger.error('Error updating user status', { account_id, status, error });
       throw error;
@@ -291,24 +323,23 @@ class User {
   }
 
   // New method: Sync user to Supabase for collaboration features
-  async syncToSupabase(account_id) {
+  async syncToSupabase(account_id, role) {
     try {
       const user = await this.findByAccountId(account_id, 'student') || 
                    await this.findByAccountId(account_id, 'professor');
       
       if (!user) {
-        this.logger.warn('User not found for Supabase sync', { account_id });
-        return false;
-      }
-
+          this.logger.warn('User not found for Supabase sync', { account_id });
+          return false;
+        }
+      
       // This would be called from HybridDatabase syncUserToSupabase method
       return {
         id: account_id.toString(),
-        email: user.email,
-        username: user.full_name || user.email.split('@')[0],
-        role: user.role || 'student',
-        avatar_url: user.profile_pic || null,
-        status: 'online'
+        email: user[0].email,
+        username: user[0].full_name || user[0].email.split('@')[0],
+        role: role || 'student',
+        avatar_url: user[0].profile_pic || null,
       };
     } catch (error) {
       this.logger.error('Error syncing user to Supabase', { account_id, error });
@@ -361,13 +392,13 @@ class StudentFinder {
         LIMIT 1
       `;
       
-      const [rows] = await this.db.execute(query, [account_id]);
+      const rows = await this.db.query(query, [account_id]);
       
-      if (rows[0]) {
-        this.logger.debug('Found student by account ID', { account_id });
-      }
+    //   if (rows[0]) {
+    //     this.logger.debug('Found student by account ID', { account_id });
+    //   }
       
-      return rows[0] || null;
+      return rows || null;
     } catch (error) {
       this.logger.error('Error finding student by account ID', { account_id, error });
       throw error;
@@ -400,8 +431,8 @@ class ProfessorFinder {
         `;
         
         // FIX: Use execute instead of query
-        const [rows] = await this.db.execute(query, [account_id]);
-        this.logger.debug('Found professor by account ID', { rows });
+        const rows = await this.db.query(query, [account_id]);
+        // this.logger.debug('Found professor by account ID', { rows });
         
         
         return rows || null;

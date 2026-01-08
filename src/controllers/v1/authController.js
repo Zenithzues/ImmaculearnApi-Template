@@ -20,7 +20,7 @@ export class AuthController {
       const token = req.cookies.accessToken || 
                     req.headers.authorization?.replace('Bearer ', '');
       
-      this.logger.debug('Profile request', { hasToken: !!token });
+      // this.logger.debug('Profile request', { hasToken: !!token });
 
       if (!token) {
         return res.status(401).json({ 
@@ -32,7 +32,7 @@ export class AuthController {
       let payload;
       try {
         payload = jwt.verify(token, process.env.JWT_SECRET);
-        this.logger.debug('Token verified', { userId: payload.userId, role: payload.role });
+        // this.logger.debug('Token verified', { userId: payload.userId, role: payload.role });
       } catch (err) {
         this.logger.warn('Invalid token', { error: err.message });
         return res.status(401).json({ 
@@ -45,7 +45,7 @@ export class AuthController {
 
       const user = await this.user.findByAccountId(payload.userId, payload.role);
       
-      if (!user) {
+      if (!user && user.length === 0) {
         this.logger.warn('User not found for profile', { userId: payload.userId, role: payload.role });
         return res.status(404).json({ 
           success: false, 
@@ -55,29 +55,31 @@ export class AuthController {
 
       // Update user status to online
       await this.user.updateUserStatus(payload.userId, 'online');
+      const result = await this.user.getUserStatus(payload.userId)
 
       // Sync user to Supabase for collaboration features
-      await hybridDatabase.syncUserToSupabase(payload.userId.toString());
+      await hybridDatabase.syncUserToSupabase(payload.userId.toString(), payload.role);
 
       const profileData = {
-        id: user.account_id,
-        email: user.email,
-        profile_pic: user.profile_pic,
-        name: user.full_name,
-        bd: user.birth_date,
-        gender: user.gender,
-        role: payload.role
+        id: user[0].account_id,
+        email: user[0].email,
+        profile_pic: user[0].profile_pic,
+        name: user[0].full_name,
+        bd: user[0].birth_date,
+        gender: user[0].gender,
+        role: payload.role,
+        status: result[0].status
       };
 
       // Add role-specific fields
       if (payload.role === "student") {
-        profileData.course = user.course;
-        profileData.yr_lvl = user.year_level;
+        profileData.course = user[0].course;
+        profileData.yr_lvl = user[0].year_level;
       } else {
-        profileData.department = user.department;
+        profileData.department = user[0].department;
       }
 
-      this.logger.info('Profile retrieved', { userId: payload.userId, role: payload.role });
+      // this.logger.info('Profile retrieved', { userId: payload.userId, role: payload.role });
 
       res.json({
         success: true,
@@ -220,7 +222,7 @@ export class AuthController {
 
       const { refreshToken, role } = cookieVal;
       
-      this.logger.debug('Refresh token attempt', { hasToken: !!refreshToken });
+      // this.logger.debug('Refresh token attempt', { hasToken: !!refreshToken });
 
       if (!refreshToken) {
         return res.status(401).json({ 
@@ -247,7 +249,7 @@ export class AuthController {
       // Check if refresh token is expired
       if (new Date(userTokenRecord.expires_at) < new Date()) {
         await this.userTokenModel.invalidate(userTokenRecord.token_id);
-        this.logger.warn('Refresh token expired', { token_id: userTokenRecord.token_id });
+        // this.logger.warn('Refresh token expired', { token_id: userTokenRecord.token_id });
         return res.status(401).json({ 
           success: false, 
           message: 'Refresh token expired' 
@@ -268,7 +270,7 @@ export class AuthController {
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
-      this.logger.debug('Token refreshed', { account_id: userTokenRecord.account_id });
+      // this.logger.debug('Token refreshed', { account_id: userTokenRecord.account_id });
 
       res.json({ 
         success: true,
@@ -343,10 +345,10 @@ export class AuthController {
       try {
         const payload = jwt.verify(token, process.env.JWT_SECRET);
         
-        this.logger.debug('Protected route accessed', { 
-          userId: payload.userId, 
-          endpoint: req.originalUrl 
-        });
+        // this.logger.debug('Protected route accessed', { 
+        //   userId: payload.userId, 
+        //   endpoint: req.originalUrl 
+        // });
 
         res.json({ 
           success: true,

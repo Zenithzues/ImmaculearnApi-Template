@@ -41,7 +41,6 @@ export class AuthController {
         });
       }
 
-      console.log("Hello world!!!!")
 
       const user = await this.user.findByAccountId(payload.userId, payload.role);
       
@@ -213,14 +212,16 @@ export class AuthController {
     try {
       const cookieVal = req.cookies.refreshToken && JSON.parse(req.cookies.refreshToken);
 
+      
       if (!cookieVal) {
         return res.status(401).json({ 
           success: false, 
           message: 'Refresh token not found' 
         });
       }
-
+      
       const { refreshToken, role } = cookieVal;
+      // this.logger.debug("REFRESHH TOKEN", { refreshToken})
       
       // this.logger.debug('Refresh token attempt', { hasToken: !!refreshToken });
 
@@ -288,19 +289,38 @@ export class AuthController {
 
   async logout(req, res) {
     try {
-      const userId = req.user?.account_id;
+      // const account_id = req.locals.account_id;
+      const { user_id } = req.body || {};
       const token = req.cookies.accessToken;
+
+      let payload;
+      try {
+        payload = jwt.verify(token, process.env.JWT_SECRET);
+        // this.logger.debug('Token verified', { userId: payload.userId, role: payload.role });
+      } catch (err) {
+        this.logger.warn('Invalid token', { error: err.message });
+        throw err
+        // return res.status(401).json({ 
+        //   success: false, 
+        //   message: 'Invalid or expired token' 
+        // });
+      }
+
+      const account_id = payload.userId;
       
-      if (userId) {
+      if (account_id !== user_id ) res.json({ success: false, message: "Unknown User!"})
+
+      if (account_id) {
         // Invalidate all tokens for user
-        await this.userTokenModel.invalidateByUserId(userId);
+        await this.userTokenModel.invalidateByUserId(account_id);
         
         // Update status to offline
-        await this.user.updateUserStatus(userId, 'offline');
+        await this.user.updateUserStatus(account_id, 'offline');
         
-        this.logger.userActivity(userId, 'logout', {
+        this.logger.debug('logout', {
           success: true,
-          ip: req.ip
+          ip: req.ip,
+          account_id
         });
       }
 

@@ -3,6 +3,8 @@
 import jwt from 'jsonwebtoken'
 import Space from '../../models/MySQL/SpaceModel.js';
 import { Logger } from '../../utils/Logger.js';
+import maskEmail from '../../utils/maskEmail.js';
+import maskFullName from '../../utils/maskFullName.js';
 
 class SpaceController {
   constructor() {
@@ -25,6 +27,56 @@ class SpaceController {
         success: true,
         message: "Creating Space Successfully!",
         space_uuid: result.space_uuid,
+      })
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+  async joinSpace(req, res) {
+    try {
+
+      const account_id = res.locals.account_id || 1;
+      const { space_uuid } = req.body || {};
+
+
+      if (!space_uuid) res.json({
+        success: false,
+        message: "Join space Unsuccessful."
+      })
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (account_id === space[0].created_by) return res.json({success: false, message: "Invalid Request Joining in Your own Space"})
+
+      if (!space) return res.json({success: false, message: "Invalid Request"})
+      await this.space.joinSpace(account_id, space[0].space_id);
+
+      res.json({
+        success: true,
+        message: "Successfully Join, Wait for Aprroval of Space Owner",
+      })
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+
+  async add_user_in_space_by_reg_email(req, res) {
+    try {
+      res.json({
+        success: true,
+        message: "Successfully Add User"
       })
 
     } catch(err) {
@@ -74,7 +126,9 @@ class SpaceController {
         success: true,
         data: {
           space: {
-            space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
+            space_link: `${process.env.NODE_ENV === 'production'
+                    ? 'https://immaculearnapi-template-production.up.railway.app' 
+                    : 'http://localhost:3000'}/space/j?token=${result.space_uuid}`,
             space_name: result.space_name,
             space_description: result.description
           }
@@ -93,29 +147,71 @@ class SpaceController {
     }
   }
 
-  async get_all_space(req, res) {
+  async get_all_friends_space(req, res) {
     try {
         const account_id = res.locals.account_id || 1;
 
-        const result = await this.space.getAllSpace(account_id);
+        const result = await this.space.getAllFriendSpaces(account_id);
 
         const spaces = result.map(item => ({
-            space_link: `immaculearn.collab.app/space/${item.space_uuid}`,
+            space_uuid: item.space_uuid,
+            space_link: `${process.env.NODE_ENV === 'production'
+                    ? 'https://immaculearnapi-template-production.up.railway.app' 
+                    : 'http://localhost:3000'}/space/j?t=${item.space_uuid}`,
             space_name: item.space_name,
             space_description: item.description,
             creator: item.created_by,
-            members: item.members
-                    ? item.members.split(',').map(Number)
-                    : []
+            members: item.members.map(member => ({
+                ...member,
+                full_name: maskFullName(member.full_name),
+                email: maskEmail(member.email)  // <-- mask email
+            }))
         }));
 
-        console.log(spaces)
+        // console.log(spaces)
 
         res.json({
             success: true,
-            message: "Successfully get all user Spaces",
+            message: "Successfully get all friends Spaces",
             data: spaces
         });
+
+        } catch (err) {
+            res.json({
+            success: false,
+            message: err.toString(),
+            });
+        }
+    }
+
+    async get_all_space(req, res) {
+        try {
+            const account_id = res.locals.account_id || 1;
+
+            const result = await this.space.getAllSpace(account_id);
+
+            const spaces = result.map(item => ({
+                space_uuid: item.space_uuid,
+                space_link: `${process.env.NODE_ENV === 'production'
+                        ? 'https://immaculearnapi-template-production.up.railway.app' 
+                        : 'http://localhost:3000'}/space/j?t=${item.space_uuid}`,
+                space_name: item.space_name,
+                space_description: item.description,
+                creator: item.created_by,
+                members: item.members.map(member => ({
+                    ...member,
+                    full_name: maskFullName(member.full_name),
+                    email: maskEmail(member.email)  // <-- mask email
+                }))
+            }));
+
+            // console.log(spaces)
+
+            res.json({
+                success: true,
+                message: "Successfully get all user Spaces",
+                data: spaces
+            });
 
         } catch (err) {
             res.json({
@@ -212,6 +308,52 @@ class SpaceController {
     //         });
     //     }
     // }
+
+
+  async delete_space(req, res) {
+    try {
+      const { space_uuid } = req.params || {};
+      const account_id = res.locals.account_id || 1;
+
+      if (!space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Space UUID is required"
+        });
+      }
+
+      // Only the owner can delete the space
+      const space = await this.space.getBySpaceUuid(space_uuid);
+      if (!space) {
+        return res.status(404).json({
+          success: false,
+          message: "Space not found"
+        });
+      }
+
+      if (space[0].created_by !== account_id) {
+        return res.status(403).json({
+          success: false,
+          message: "Only the owner can delete this space"
+        });
+      }
+
+      // Delete space and related data
+      await this.space.deleteSpace(space_uuid);
+
+      res.json({
+        success: true,
+        message: `Space "${space[0].space_name}" deleted successfully`
+      });
+
+    } catch(err) {
+      res.status(500).json({
+        success: false,
+        message: err.toString()
+      });
+    }
+  }
+
 
 }
 

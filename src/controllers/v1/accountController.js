@@ -118,7 +118,7 @@ class AccountController {
       const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
       const existingToken = await this.userTokenModel.findByUserId(user.account_id);
 
-      console.log(existingToken)
+      // console.log(existingToken)
 
       if (existingToken) {
         await this.userTokenModel.update(user.account_id, hashedRefresh);
@@ -142,13 +142,13 @@ class AccountController {
             sameSite: "Strict",
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           });
+          return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
       }
 
       // Existing user → generate JWT
       // const sessionToken = jwtService.sign({ id: user.id });
 
       // return res.redirect("http://localhost:5173/home");
-      return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
 
 
     } catch (error) {

@@ -1,277 +1,254 @@
 // src/controllers/v1/chatController.js
-import { supabaseConnection } from '../../config/supabaseConnection.js';
-import { Logger } from '../../utils/Logger.js';
+import { WebSocketServer } from '../../core/WebSocketServer.js'
+import { supabaseConnection } from '../../config/supabaseConnection.js'
+import { Logger } from '../../utils/Logger.js'
 
 export class ChatController {
   constructor() {
-    this.logger = new Logger('ChatController');
-    this.supabase = supabaseConnection;
+    this.logger = new Logger('ChatController')
+    this.supabase = supabaseConnection
+    this.wsServer = WebSocketServer.getInstance()
+  }
+
+  // ======================
+  // SNAPSHOTS
+  // ======================
+
+  async getRoomSnapshot(req, res) {
+    try {
+      const { roomId } = req.params
+      const userId = req.user.id
+
+      const { data: access } = await this.supabase.getClient()
+        .from('room_participants')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!access) return res.status(403).json({ error: 'Access denied' })
+
+      const { data } = await this.supabase.getClient()
+        .from('chat_snapshots')
+        .select('data, version')
+        .eq('room_id', roomId)
+        .single()
+
+      res.json({
+        success: true,
+        snapshot: data?.data || null,
+        version: data?.version || 0
+      })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+
+  // ======================
+  // ROOMS
+  // ======================
+
+  async getRooms(req, res) {
+    try {
+      const userId = req.user.id
+
+      const { data, error } = await this.supabase.getClient()
+        .from('chat_rooms')
+        .select(`
+          *,
+          participants:room_participants!inner(role)
+        `)
+        .eq('room_participants.user_id', userId)
+
+      if (error) throw error
+      res.json({ success: true, rooms: data })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+
+  async getRoomDetails(req, res) {
+    try {
+      const { roomId } = req.params
+      const userId = req.user.id
+
+      const { data: access } = await this.supabase.getClient()
+        .from('room_participants')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!access) return res.status(403).json({ error: 'Access denied' })
+
+      const { data, error } = await this.supabase.getClient()
+        .from('chat_rooms')
+        .select('*')
+        .eq('id', roomId)
+        .single()
+
+      if (error) throw error
+      res.json({ success: true, room: data })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
+    }
   }
 
   async createRoom(req, res) {
     try {
-      const { name, description, type = 'channel', isPublic = true } = req.body;
-      const userId = '1';
-      
-      this.logger.debug('Creating room', { name, userId, type });
-      
-      // Ensure Supabase is connected
-      await this.supabase.ensureConnected();
-      const supabaseClient = this.supabase.getClient();
-      
-      const { data: room, error } = await supabaseClient
+      const { name, description, isPublic = true } = req.body
+      const userId = req.user.id
+
+      const { data: room, error } = await this.supabase.getClient()
         .from('chat_rooms')
-        .insert({
-          name,
-          description,
-          type,
-          created_by: userId,
-          is_public: isPublic
-        })
+        .insert({ name, description, is_public: isPublic, created_by: userId })
         .select()
-        .single();
-      
-      if (error) {
-        this.logger.error('Failed to create room:', error);
-        throw error;
-      }
-      
-      // Add creator as owner
-      const { error: participantError } = await supabaseClient
+        .single()
+
+      if (error) throw error
+
+      await this.supabase.getClient()
         .from('room_participants')
-        .insert({
-          room_id: room.id,
-          user_id: userId,
-          role: 'owner'
-        });
-      
-      if (participantError) {
-        this.logger.error('Failed to add room participant:', participantError);
-        throw participantError;
-      }
-      
-      this.logger.info('Room created successfully', { roomId: room.id, userId });
-      res.json({ success: true, room });
-      
-    } catch (error) {
-      this.logger.error('Create room error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message,
-        code: error.code 
-      });
-    }
-  }
-  
-  async sendMessage(req, res) {
-    try {
-      const { content, type = 'text' } = req.body || {};
-      const { roomId } = req.params || {}
-      const userId = '1';
-      
-      this.logger.debug('Sending message', { roomId, userId, contentLength: content?.length });
-      
-      // Validate required fields
-      if (!roomId || !content) {
-        return res.status(400).json({
-          success: false,
-          error: 'roomId and content are required'
-        });
-      }
-      
-      // Ensure Supabase is connected
-      await this.supabase.ensureConnected();
-      const supabaseClient = this.supabase.getClient();
-      
-      const { data: message, error } = await supabaseClient
-        .from('messages')
-        .insert({
-          room_id: roomId,
-          sender_id: userId,
-          content,
-          type
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        this.logger.error('Failed to send message:', error);
-        throw error;
-      }
-      
-      this.logger.info('Message sent successfully', { 
-        messageId: message.id, 
-        roomId, 
-        userId 
-      });
-      res.json({ success: true, message });
-      
-    } catch (error) {
-      this.logger.error('Send message error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message,
-        code: error.code 
-      });
+        .insert({ room_id: room.id, user_id: userId, role: 'owner' })
+
+      // Create empty CRDT snapshot
+      await this.supabase.getClient()
+        .from('chat_snapshots')
+        .insert({ room_id: room.id, data: {}, version: 1 })
+
+      this.wsServer.broadcastToUserConnections(userId, {
+        type: 'room-created',
+        room
+      })
+
+      res.json({ success: true, room })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
     }
   }
 
-  async getMessages(req, res) {
+  async deleteRoom(req, res) {
     try {
-      const { roomId } = req.params;
-      const { limit = 50, offset = 0 } = req.query;
-      
-      this.logger.debug('Getting messages', { roomId, limit, offset });
-      
-      if (!roomId) {
-        return res.status(400).json({
-          success: false,
-          error: 'roomId is required'
-        });
-      }
-      
-      // Ensure Supabase is connected
-      await this.supabase.ensureConnected();
-      const supabaseClient = this.supabase.getClient();
-      
-      const { data: messages, error, count } = await supabaseClient
-        .from('messages')
-        .select('*', { count: 'exact' })
+      const { roomId } = req.params
+      const userId = req.user.id
+
+      const { data: access } = await this.supabase.getClient()
+        .from('room_participants')
+        .select('role')
         .eq('room_id', roomId)
-        .eq('deleted', false)
-        .order('created_at', { ascending: false })
-        .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
-
-      console.log(messages)
-      
-      if (error) {
-        this.logger.error('Failed to get messages:', error);
-        throw error;
-      }
-      
-      this.logger.debug('Retrieved messages', { count, roomId });
-      res.json({ 
-        success: true, 
-        messages: messages || [],
-        count: count || 0,
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      });
-      
-    } catch (error) {
-      this.logger.error('Get messages error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
-    }
-  }
-
-  async getRooms(req, res) {
-    try {
-      const userId = '1';
-      
-      this.logger.debug('Getting rooms for user', { userId });
-      
-      // Ensure Supabase is connected
-      await this.supabase.ensureConnected();
-      const supabaseClient = this.supabase.getClient();
-      
-      // Get rooms where user is a participant
-      const { data: rooms, error } = await supabaseClient
-        .from('room_participants')
-        .select(`
-          role,
-          joined_at,
-          room:chat_rooms (
-            id,
-            name,
-            description,
-            type,
-            created_by,
-            is_public,
-            created_at,
-            updated_at
-          )
-        `)
         .eq('user_id', userId)
-        .order('joined_at', { ascending: false });
-      
-      if (error) {
-        this.logger.error('Failed to get rooms:', error);
-        throw error;
-      }
-      
-      // Transform the response
-      const userRooms = (rooms || []).map(participant => ({
-        ...participant.room,
-        userRole: participant.role,
-        joinedAt: participant.joined_at
-      }));
-      
-      this.logger.debug('Retrieved rooms', { count: userRooms.length, userId });
-      res.json({ success: true, rooms: userRooms });
-      
-    } catch (error) {
-      this.logger.error('Get rooms error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
+        .eq('role', 'owner')
+        .single()
+
+      if (!access) return res.status(403).json({ error: 'Only owner can delete' })
+
+      await this.supabase.getClient()
+        .from('chat_snapshots')
+        .delete()
+        .eq('room_id', roomId)
+
+      await this.supabase.getClient()
+        .from('room_participants')
+        .delete()
+        .eq('room_id', roomId)
+
+      await this.supabase.getClient()
+        .from('chat_rooms')
+        .delete()
+        .eq('id', roomId)
+
+      this.wsServer.destroyRoom(roomId)
+
+      res.json({ success: true })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
     }
   }
+
+  // ======================
+  // PARTICIPANTS
+  // ======================
 
   async getRoomParticipants(req, res) {
     try {
-      const { roomId } = req.params;
-      
-      this.logger.debug('Getting room participants', { roomId });
-      
-      if (!roomId) {
-        return res.status(400).json({
-          success: false,
-          error: 'roomId is required'
-        });
-      }
-      
-      // Ensure Supabase is connected
-      await this.supabase.ensureConnected();
-      const supabaseClient = this.supabase.getClient();
-      
-      const { data: participants, error } = await supabaseClient
+      const { roomId } = req.params
+
+      const { data, error } = await this.supabase.getClient()
         .from('room_participants')
-        .select(`
-          id,
-          role,
-          joined_at,
-          last_read_at,
-          user:users (
-            id,
-            username,
-            email,
-            avatar_url,
-            status
-          )
-        `)
+        .select(`role, user:users(id, username, avatar_url)`)
         .eq('room_id', roomId)
-        .order('joined_at', { ascending: true });
-      
-      if (error) {
-        this.logger.error('Failed to get room participants:', error);
-        throw error;
-      }
-      
-      this.logger.debug('Retrieved participants', { count: participants?.length, roomId });
-      res.json({ success: true, participants: participants || [] });
-      
-    } catch (error) {
-      this.logger.error('Get room participants error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
+
+      if (error) throw error
+
+      res.json({
+        success: true,
+        participants: data.map(p => ({
+          ...p.user,
+          role: p.role,
+          isOnline: this.wsServer.isUserOnline(p.user.id)
+        }))
+      })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+
+  async addParticipants(req, res) {
+    try {
+      const { roomId } = req.params
+      const { userIds } = req.body
+      const currentUserId = req.user.id
+
+      const rows = userIds.map(id => ({
+        room_id: roomId,
+        user_id: id,
+        role: 'member'
+      }))
+
+      await this.supabase.getClient()
+        .from('room_participants')
+        .insert(rows)
+
+      this.wsServer.broadcastToRoom(roomId, {
+        type: 'participants-updated',
+        roomId
+      })
+
+      res.json({ success: true })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  }
+
+  async removeParticipant(req, res) {
+    try {
+      const { roomId, userId } = req.params
+
+      await this.supabase.getClient()
+        .from('room_participants')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+
+      this.wsServer.broadcastToRoom(roomId, {
+        type: 'participant-removed',
+        roomId,
+        userId
+      })
+
+      res.json({ success: true })
+    } catch (err) {
+      this.logger.error(err)
+      res.status(500).json({ error: err.message })
     }
   }
 }
 
-export default ChatController;
+export default ChatController

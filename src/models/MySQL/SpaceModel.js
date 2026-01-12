@@ -9,6 +9,22 @@ class Space {
     this.logger = new Logger('SpaceModel');
   }
 
+  async getBySpaceUuid(space_uuid) {
+    try {
+        const space = await this.db.query(
+            `
+            SELECT space_id, space_name, created_by FROM spaces
+            WHERE space_uuid = ?
+            `, [space_uuid]
+        )
+
+        return space
+    } catch(err) {
+        this.logger.error('Error getting Space ID', { space_uuid, err });
+        throw err;
+    }
+  }
+
 
   async getBySpaceId(space_id) {
     
@@ -55,7 +71,29 @@ class Space {
     }
   }
 
-  async getAllSpace(account_id) {
+  async joinSpace(account_id, space_id) {
+    try {
+        // const space_id = await this.getSpaceId(space_uuid);
+
+        const row = await this.db.execute(`
+            INSERT INTO space_members (space_id, account_id, status)
+            VALUES (?, ?, 'pending')
+            ON DUPLICATE KEY UPDATE 
+            status = IF(status = 'accepted', status, 'pending')
+        `, [space_id, account_id]);
+
+
+        return row
+
+
+    } catch(err) {
+        this.logger.error('Error Joining Space', { account_id, space_id, err });
+        throw err;
+    }
+  }
+
+
+  async getAllFriendSpaces(account_id) {
     try {
         const rows = await this.db.query(
             `
@@ -63,28 +101,108 @@ class Space {
                 sp.space_uuid,
                 sp.space_name,
                 sp.description,
-                sp.created_by,
-                GROUP_CONCAT(spm.account_id) AS members
+                sp.created_by AS creator,
+                JSON_ARRAYAGG(
+                    DISTINCT JSON_OBJECT(
+                        'account_id', acc.account_id,
+                        'email', acc.email,
+                        'profile_pic', acc.profile_pic,
+                        'full_name', COALESCE(CONCAT(st.student_fn, ' ', st.student_ln), CONCAT(pr.prof_fn, ' ', pr.prof_ln)),
+                        'birth_date', COALESCE(st.student_bd, pr.prof_bd),
+                        'gender', COALESCE(st.student_gender, pr.prof_gender),
+                        'course', st.student_course,
+                        'year_level', st.student_yr_lvl,
+                        'department', pr.prof_department,
+                        'role', CASE 
+                            WHEN acc.account_id = sp.created_by THEN 'creator'
+                            WHEN st.account_id IS NOT NULL THEN 'student' 
+                            ELSE 'professor' 
+                        END
+                    )
+                ) AS members
             FROM spaces sp
             LEFT JOIN space_members spm
-                ON sp.space_id = spm.space_id
-                AND spm.status = 'accepted'
-            WHERE sp.created_by = ?
-            GROUP BY 
-                sp.space_uuid,
-                sp.space_name,
-                sp.description,
-                sp.created_by;
+                ON sp.space_id = spm.space_id AND spm.status = 'accepted'
+            LEFT JOIN accounts acc
+                ON acc.account_id = spm.account_id OR acc.account_id = sp.created_by
+            LEFT JOIN students st
+                ON acc.account_id = st.account_id
+            LEFT JOIN professors pr
+                ON acc.account_id = pr.account_id
+            WHERE sp.created_by = ? OR EXISTS (
+                SELECT 1 FROM space_members sm 
+                WHERE sm.space_id = sp.space_id AND sm.account_id = ?
+            )
+            GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,
-            [account_id]
+            [account_id, account_id]
         );
+
+        // Parse JSON members
+        rows.forEach(space => {
+            space.members = JSON.parse(space.members || '[]');
+        });
 
         return rows;
     } catch(err) {
-        this.logger.error('Error getting All Space', { account_id })
+        this.logger.error('Error Getting All Friend Spaces', { account_id, err });
         throw err;
     }
   }
+
+
+
+  async getAllSpace(account_id) {
+    try {
+        const rows = await this.db.query(
+        `
+        SELECT 
+            sp.space_uuid,
+            sp.space_name,
+            sp.description,
+            sp.created_by,
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'account_id', acc.account_id,
+                    'email', acc.email,
+                    'profile_pic', acc.profile_pic,
+                    'full_name', COALESCE(CONCAT(st.student_fn, ' ', st.student_ln), CONCAT(pr.prof_fn, ' ', pr.prof_ln)),
+                    'birth_date', COALESCE(st.student_bd, pr.prof_bd),
+                    'gender', COALESCE(st.student_gender, pr.prof_gender),
+                    'course', st.student_course,
+                    'year_level', st.student_yr_lvl,
+                    'department', pr.prof_department,
+                    'role', CASE WHEN st.account_id IS NOT NULL THEN 'student' ELSE 'professor' END
+                )
+            ) AS members
+        FROM spaces sp
+        LEFT JOIN space_members spm 
+            ON sp.space_id = spm.space_id
+            AND spm.status = 'accepted'
+        LEFT JOIN accounts acc
+            ON spm.account_id = acc.account_id
+        LEFT JOIN students st
+            ON acc.account_id = st.account_id
+        LEFT JOIN professors pr
+            ON acc.account_id = pr.account_id
+        WHERE sp.created_by = ?
+        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
+        `,
+        [account_id]
+        );
+
+        // Optional: parse JSON members if needed
+        rows.forEach(space => {
+        space.members = JSON.parse(space.members || '[]');
+        });
+
+        return rows;
+    } catch (err) {
+        this.logger.error('Error getting All Space', { account_id });
+        throw err;
+    }
+    }
+
 
   async getJoinRequestsBySpaceId(account_id, space_uuid) {
     try {
@@ -160,6 +278,31 @@ class Space {
         throw err;
     }
   }
+
+  async deleteSpace(space_uuid) {
+    try {
+        // Delete members
+        await this.db.execute(
+        "DELETE FROM space_members WHERE space_id = (SELECT space_id FROM spaces WHERE space_uuid = ?)",
+        [space_uuid]
+        );
+
+        // Delete tasks (optional)
+        // await this.db.execute(
+        // "DELETE FROM tasks WHERE space_id = (SELECT space_id FROM spaces WHERE space_uuid = ?)",
+        // [space_uuid]
+        // );
+
+        // Delete the space itself
+        await this.db.execute("DELETE FROM spaces WHERE space_uuid = ?", [space_uuid]);
+
+        return true;
+    } catch(err) {
+        console.error("Error deleting space:", err);
+        throw err;
+    }
+    }
+
 }
 
 

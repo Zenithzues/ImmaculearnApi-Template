@@ -12,6 +12,7 @@ authRouter.use(authorization);
 authRouter.get('/profile', authController.profile.bind(authController));
 
 authRouter.post('/login', authController.login.bind(authController));
+authRouter.post('/logout', authController.logout.bind(authController));
 authRouter.post('/refresh', authController.refresh.bind(authController));
 authRouter.get('/protected', authController.protectedRoute.bind(authController));
 

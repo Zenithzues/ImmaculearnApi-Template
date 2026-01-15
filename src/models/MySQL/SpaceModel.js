@@ -102,24 +102,25 @@ class Space {
                 sp.space_name,
                 sp.description,
                 sp.created_by AS creator,
-                JSON_ARRAYAGG(
-                    DISTINCT JSON_OBJECT(
-                        'account_id', acc.account_id,
-                        'email', acc.email,
-                        'profile_pic', acc.profile_pic,
-                        'full_name', COALESCE(CONCAT(st.student_fn, ' ', st.student_ln), CONCAT(pr.prof_fn, ' ', pr.prof_ln)),
-                        'birth_date', COALESCE(st.student_bd, pr.prof_bd),
-                        'gender', COALESCE(st.student_gender, pr.prof_gender),
-                        'course', st.student_course,
-                        'year_level', st.student_yr_lvl,
-                        'department', pr.prof_department,
-                        'role', CASE 
+                CONCAT('[', GROUP_CONCAT(
+                    CONCAT(
+                        '{"account_id":', acc.account_id,
+                        ',"email":"', IFNULL(acc.email,''),
+                        '","profile_pic":"', IFNULL(acc.profile_pic,''),
+                        '","full_name":"', IFNULL(COALESCE(CONCAT(st.student_fn,' ',st.student_ln), CONCAT(pr.prof_fn,' ',pr.prof_ln)),''),
+                        '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd),''),
+                        '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender),''),
+                        '","course":"', IFNULL(st.student_course,''),
+                        '","year_level":"', IFNULL(st.student_yr_lvl,''),
+                        '","department":"', IFNULL(pr.prof_department,''),
+                        '","role":"', CASE 
                             WHEN acc.account_id = sp.created_by THEN 'creator'
-                            WHEN st.account_id IS NOT NULL THEN 'student' 
-                            ELSE 'professor' 
-                        END
+                            WHEN st.account_id IS NOT NULL THEN 'student'
+                            ELSE 'professor'
+                        END,
+                        '"}'
                     )
-                ) AS members
+                ), ']') AS members
             FROM spaces sp
             LEFT JOIN space_members spm
                 ON sp.space_id = spm.space_id AND spm.status = 'accepted'
@@ -140,7 +141,11 @@ class Space {
 
         // Parse JSON members
         rows.forEach(space => {
-            space.members = JSON.parse(space.members || '[]');
+            try {
+                space.members = JSON.parse(space.members || '[]');
+            } catch(e) {
+                space.members = [];
+            }
         });
 
         return rows;
@@ -152,56 +157,63 @@ class Space {
 
 
 
+
   async getAllSpace(account_id) {
     try {
         const rows = await this.db.query(
-        `
-        SELECT 
-            sp.space_uuid,
-            sp.space_name,
-            sp.description,
-            sp.created_by,
-            JSON_ARRAYAGG(
-                JSON_OBJECT(
-                    'account_id', acc.account_id,
-                    'email', acc.email,
-                    'profile_pic', acc.profile_pic,
-                    'full_name', COALESCE(CONCAT(st.student_fn, ' ', st.student_ln), CONCAT(pr.prof_fn, ' ', pr.prof_ln)),
-                    'birth_date', COALESCE(st.student_bd, pr.prof_bd),
-                    'gender', COALESCE(st.student_gender, pr.prof_gender),
-                    'course', st.student_course,
-                    'year_level', st.student_yr_lvl,
-                    'department', pr.prof_department,
-                    'role', CASE WHEN st.account_id IS NOT NULL THEN 'student' ELSE 'professor' END
-                )
-            ) AS members
-        FROM spaces sp
-        LEFT JOIN space_members spm 
-            ON sp.space_id = spm.space_id
-            AND spm.status = 'accepted'
-        LEFT JOIN accounts acc
-            ON spm.account_id = acc.account_id
-        LEFT JOIN students st
-            ON acc.account_id = st.account_id
-        LEFT JOIN professors pr
-            ON acc.account_id = pr.account_id
-        WHERE sp.created_by = ?
-        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
-        `,
-        [account_id]
+            `
+            SELECT 
+                sp.space_uuid,
+                sp.space_name,
+                sp.description,
+                sp.created_by,
+                CONCAT('[', GROUP_CONCAT(
+                    CONCAT(
+                        '{"account_id":', acc.account_id,
+                        ',"email":"', IFNULL(acc.email,''),
+                        '","profile_pic":"', IFNULL(acc.profile_pic,''),
+                        '","full_name":"', IFNULL(COALESCE(CONCAT(st.student_fn,' ',st.student_ln), CONCAT(pr.prof_fn,' ',pr.prof_ln)),''),
+                        '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd),''),
+                        '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender),''),
+                        '","course":"', IFNULL(st.student_course,''),
+                        '","year_level":"', IFNULL(st.student_yr_lvl,''),
+                        '","department":"', IFNULL(pr.prof_department,''),
+                        '","role":"', CASE WHEN st.account_id IS NOT NULL THEN 'student' ELSE 'professor' END,
+                        '"}'
+                    )
+                ), ']') AS members
+            FROM spaces sp
+            LEFT JOIN space_members spm 
+                ON sp.space_id = spm.space_id
+                AND spm.status = 'accepted'
+            LEFT JOIN accounts acc
+                ON spm.account_id = acc.account_id
+            LEFT JOIN students st
+                ON acc.account_id = st.account_id
+            LEFT JOIN professors pr
+                ON acc.account_id = pr.account_id
+            WHERE sp.created_by = ?
+            GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
+            `,
+            [account_id]
         );
 
-        // Optional: parse JSON members if needed
+        // Parse members JSON safely
         rows.forEach(space => {
-        space.members = JSON.parse(space.members || '[]');
+            try {
+                space.members = JSON.parse(space.members || '[]');
+            } catch(e) {
+                space.members = [];
+            }
         });
 
         return rows;
     } catch (err) {
-        this.logger.error('Error getting All Space', { account_id });
+        this.logger.error('Error getting All Space', { account_id, err });
         throw err;
     }
-    }
+  }   
+
 
 
   async getJoinRequestsBySpaceId(account_id, space_uuid) {

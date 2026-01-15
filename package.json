@@ -34,6 +34,7 @@
     "fs": "^0.0.1-security",
     "googleapis": "^169.0.0",
     "jsonwebtoken": "^9.0.2",
+    "level": "^10.0.0",
     "lib0": "^0.2.114",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",

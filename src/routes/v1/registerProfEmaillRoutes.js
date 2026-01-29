@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import RegisterProfEmailController from '../../controllers/v1/registerProfEmailController.js';
-import upload from '../../middlewares/upload.js';
+import upload from '../../middlewares/uploadexcel.js';
 
 const regprofemailRouter = new Router();
 const regprofemail = new RegisterProfEmailController();
@@ -26,7 +26,8 @@ regprofemailRouter.post(
 
 // Get all registered emails
 regprofemailRouter.get(
-  '/all_emails',
+  '/all_emails_prof',
   regprofemail.getAllEmailsAction.bind(regprofemail)
 );
+
 export default regprofemailRouter;

@@ -1,12 +1,17 @@
-import jwt from 'jsonwebtoken';
-import User from '../../models/user.js';
+import crypto from 'crypto'
+// import User from '../../models/user.js';
 import socket from '../../core/socket.js';
 import jwtService from '../../services/jwtService.js';
 import axios from 'axios';
+import { generateAccessToken, generateRefreshToken } from '../../utils/tokens.js';
+// import { UserToken } from '../../models/userToken.js';
+import { UserToken } from '../../models/MySQL/UserToken.js';
+import User from '../../models/MySQL/UserModel.js';
 
 class AccountController {
   constructor() {
     this.user = new User();
+    this.userTokenModel = new UserToken();
   }
 
 
@@ -40,12 +45,12 @@ class AccountController {
   async oauthGoogleCallback(req, res) {
     try {
       const code = req.query.code;
-      const state = req.query.state;
+      // const state = req.query.state;
 
-      if (!code) return res.status(400).json({ error: "Code missing in callback" });
+      if (!code) return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed")
 
       // Decode role from state
-      const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
+      // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
 
       // Exchange code for access token
       const tokenRes = await axios.post(
@@ -71,58 +76,197 @@ class AccountController {
       const { sub: googleId, email, name, picture } = userInfoRes.data;
 
       // Find or create partial user with role
-      const { user, tempToken, needsOnboarding } = await this.findOrCreate({
+      const result = await this.findOrCreate({
         googleId,
         email,
         name,
         picture,
-        role
+        // role
       });
 
+      if (!result) return res.redirect("http://localhost:5173/oauth/callback?error=not_registered");
+
+      const { user, role, tempToken, needsOnboarding} = result;
+
+      console.log("NEEEDSSS ON BOARDING:",needsOnboarding)
+
       if (needsOnboarding) {
+        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
+        return res.redirect(`http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`);
+
         // New user → redirect to onboarding page with tempToken
-        return res.json({
-          message: "Onboarding required",
-          tempToken,
-          user,
-        });
+        // return res.json({
+        //   message: "Onboarding required",
+        //   tempToken,
+        //   user,
+        // });
+      }
+
+      // Existing user → generate access & refresh tokens
+      const accessToken = generateAccessToken(user.account_id, role);
+      const refreshToken = generateRefreshToken();
+
+      console.log("REFRESH TOKEN GENERATED: ", refreshToken)
+
+      // const { account_id, googleId: google_id} = user;
+
+      // Hash refresh token before storing in DB
+
+      // console.log(account_id, google_id)
+
+      console.log(user)
+      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const existingToken = await this.userTokenModel.findByUserId(user.account_id);
+
+      // console.log(existingToken)
+
+      if (existingToken) {
+        await this.userTokenModel.update(user.account_id, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(user.account_id, hashedRefresh);
+      }
+
+      
+      if (user) {
+          // Set tokens in HTTP-only cookies
+          res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "Strict",
+            maxAge: 15 * 60 * 1000, // 15 minutes
+          });
+    
+          res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "Strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          });
+          return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
       }
 
       // Existing user → generate JWT
-      const sessionToken = jwtService.sign({ id: user.id });
+      // const sessionToken = jwtService.sign({ id: user.id });
 
-      return res.json({
-        message: "Google login successful",
-        token: sessionToken,
-        user,
-      });
+      // return res.redirect("http://localhost:5173/home");
+
 
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
-      return res.status(500).json({
-        error: "OAuth failed",
-        details: error.response?.data || error.message
-      });
+      return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed");
     }
   }
 
 
-  async findOrCreate({ googleId, email, name, picture, role }) {
-    let user = await this.user.findByGoogleId(googleId);
+  async findOrCreate({ googleId, email, name, picture }) {
+    let user = await this.user.findByEmail(email);
+
+
+    console.log(user)
+    if (!user) return null
+    
+    let role = user.role;
     let tempToken = null;
     let needsOnboarding = false;
 
+    user = await this.user.findByGoogleId(googleId);
+
+    console.log(user)
+
     if (!user) {
+
+
+
+      const results = await this.user.findByEmail(email);
+
+      if (!results) return null
+
+      console.log(results)
+
+
+      const {email: existingEmail, role: fetchRole} = results;
+      // console.log(existingEmail, fetchRole)
+
+      // if (!existingEmail) return 
       // Create partial account and profile based on role
-      user = await this.user.createPartialGoogleUser({ googleId, email, name, picture, role });
+      user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail, name, picture });
 
       // Generate temporary token for onboarding (short-lived, e.g., 15m)
       tempToken = jwtService.sign({ id: user.id }, '15m');
       needsOnboarding = true;
+      role = fetchRole;
     }
 
-    return { user, tempToken, needsOnboarding };
+    return { user, role, tempToken, needsOnboarding };
   }
+
+
+  async create_space(req, res) {
+    try {
+      const {space_name, space_description} = req.body || {};
+      const account_id = req.params.account_id || null
+
+      const result = await this.user.createSpace(account_id, space_name, space_description)
+
+      // if (!result) res.json({ success: false, message: "Failed to create Space!"})
+
+
+      res.json({
+        success: true,
+        message: "Creating Space Successfully!",
+        space_uuid: result.space_uuid,
+      })
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+  async get_space_by_id(req, res) {
+    try {
+      // const {space_name, space_description} = req.body || {};
+      const {space_id} = req.params || {}
+      // const space_id = req.query.space_id
+
+      const result = await this.user.getBySpaceId(space_id);
+
+      if (result.length === 0) return res.json({success: true, message: "Can't find space"})
+
+      res.json({
+        success: true,
+        data: {
+          space: {
+            space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
+            space_name: result.space_name,
+            space_description: result.description
+          }
+        }
+        // space_id: space_id,
+        // account_id: account_id
+      })
+      
+
+    } catch(err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
+
+
+
+
+
+
+
+
+
 
 
   /**
@@ -163,52 +307,58 @@ class AccountController {
    * @param {import('express').Response} res
    * @returns {void}
    */
+
   async login(req, res) {
     try {
       const { email, password } = req.body || {};
 
-      console.log(email, password)
-      const result = await this.user.verify(email, password);
-
-      if (!result?.account_id) {
-        return res.json({
-          success: false,
-          message: 'Invalid email or password',
-        });
+      if (!email || !password) {
+        return res.status(400).json({ success: false, message: "Email and password required" });
       }
 
+      // Verify user credentials
+      const user = await this.user.verify(email, password);
+
+      if (!user?.account_id) {
+        return res.status(401).json({ success: false, message: "Invalid email or password" });
+      }
+
+      const userId = user.account_id;
+
+      // Generate tokens
+      const accessToken = generateAccessToken(userId, role); // Implement your JWT access token function
+      const refreshToken = generateRefreshToken();     // Implement your JWT refresh token function
+
+      // Hash refresh token before storing
+      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+      // Save hashed refresh token in DB
+      const existing = await this.userTokenModel.findByUserId(userId);
+
+      if (existing) {
+        await this.userTokenModel.update(userId, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(userId, hashedRefresh);
+      }
+
+      // Optionally: emit a socket event for login
       const io = socket.getIO();
+      io.emit("user:login", { userId, email });
 
-      io.emit("user:login", { userId: result?.account_id, email: email})
-
-      console.log(
-        {
-          success: true,
-          data: {
-            token: jwt.sign({ 'email': email, 'account_id': result?.account_id }, process.env.API_SECRET_KEY, {
-              expiresIn: process.env.JWT_EXPIRES_IN || '90d',
-            }),
-          }
-        }
-      )
-
+      // Return tokens to client
       res.json({
         success: true,
         data: {
-          token: jwt.sign({ 'email': email, 'account_id': result?.account_id }, process.env.API_SECRET_KEY, {
-            expiresIn: process.env.JWT_EXPIRES_IN || '90d',
-          }),
-        }
+          accessToken,
+          refreshToken, // send the plain refresh token to client; store only hashed version
+        },
       });
-      res.end();
     } catch (err) {
-      res.json({
-        success: false,
-        message: err.toString(),
-      });
-      res.end()
+      console.error("Login error:", err);
+      res.status(500).json({ success: false, message: err.toString() });
     }
   }
+
 
   /**
    * Get user profile

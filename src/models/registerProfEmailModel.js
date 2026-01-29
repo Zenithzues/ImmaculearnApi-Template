@@ -94,10 +94,15 @@ class RegisteredProfEmail {
   }
    
   async getAllRegisteredEmails() {
-    const sql = 'SELECT reg_email FROM registered_prof_emails';
-    const [rows] = await this.db.execute(sql);
-    return rows.map(row => row.reg_email);
-  }
+  const sql = `
+    SELECT reg_email
+    FROM registered_prof_emails
+    ORDER BY reg_id DESC
+  `;
+  const [rows] = await this.db.execute(sql);
+  return rows.map(row => row.reg_email);
+}
+
 }
 
 export default RegisteredProfEmail;

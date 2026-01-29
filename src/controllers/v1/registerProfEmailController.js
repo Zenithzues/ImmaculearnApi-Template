@@ -165,6 +165,19 @@ class RegisterProfEmailController {
       });
     }
   }
+
+
+  async getAllEmailsAction(req, res) {
+    try {
+      const emails = await this.model.getAllRegisteredEmails(); 
+      return res.json({ emails });
+    } catch (err) {
+      return res.status(500).json({
+        message: 'Failed to retrieve emails',
+        error: err.message,
+      });
+    }
+  }
 }
 
 export default RegisterProfEmailController;

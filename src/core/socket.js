@@ -1,42 +1,112 @@
+// src/core/socket.js (server-side)
 import { Server } from 'socket.io';
 
 let io;
-const onlineUsers = new Map(); // key = userId, value = socket.id
+const onlineUsers = new Map(); // key = userId, value = { socketId, spaces: Set<spaceUuid> }
 
 export default {
   init: (server) => {
     io = new Server(server, {
-      cors: { origin: '*' }
+      cors: { 
+        origin: process.env.CLIENT_URL || 'http://localhost:5173',
+        credentials: true
+      }
     });
 
     io.on('connection', (socket) => {
       console.log('A user connected:', socket.id);
 
-      // When user joins, they send their userId
-      socket.on("user:join", (userId) => {
-        onlineUsers.set(userId, socket.id);
-        console.log(`User ${userId} is online`);
-
-        // Broadcast updated online users list
-        io.emit("onlineUser:update", Array.from(onlineUsers.keys()));
+      // When user joins with their userId
+      socket.on('user:join', (userId) => {
+        onlineUsers.set(userId, {
+          socketId: socket.id,
+          spaces: new Set()
+        });
+        console.log(`User ${userId} connected`);
+        updateOnlineUsers();
       });
 
+      // Join a chat room
+      socket.on('join_chat', ({ spaceUuid }) => {
+        const userId = getUserIdBySocketId(socket.id);
+        if (!userId) return;
+
+        const userData = onlineUsers.get(userId);
+        if (userData) {
+          socket.join(`chat:${spaceUuid}`);
+          userData.spaces.add(spaceUuid);
+          console.log(`User ${userId} joined chat ${spaceUuid}`);
+          
+          // Notify others in the room
+          socket.to(`chat:${spaceUuid}`).emit('user_joined', { userId });
+        }
+      });
+
+      // Leave a chat room
+      socket.on('leave_chat', ({ spaceUuid }) => {
+        const userId = getUserIdBySocketId(socket.id);
+        if (!userId) return;
+
+        const userData = onlineUsers.get(userId);
+        if (userData?.spaces.has(spaceUuid)) {
+          socket.leave(`chat:${spaceUuid}`);
+          userData.spaces.delete(spaceUuid);
+          console.log(`User ${userId} left chat ${spaceUuid}`);
+          
+          // Notify others in the room
+          socket.to(`chat:${spaceUuid}`).emit('user_left', { userId });
+        }
+      });
+
+      // Handle new messages
+      socket.on('send_message', (messageData) => {
+        const { spaceUuid, content, senderId } = messageData;
+        
+        // Create message object
+        const message = {
+          id: Date.now().toString(),
+          content,
+          senderId,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Broadcast to all in the room except sender
+        socket.to(`chat:${spaceUuid}`).emit('receive_message', message);
+        
+        // Also send back to sender for confirmation
+        socket.emit('receive_message', message);
+      });
+
+      // Handle disconnection
       socket.on('disconnect', () => {
-        // Remove user by matching socket.id
-        let disconnectedUserId = null;
-        for (const [userId, id] of onlineUsers.entries()) {
-          if (id === socket.id) {
-            disconnectedUserId = userId;
-            break;
-          }
-        }
+        const userId = getUserIdBySocketId(socket.id);
+        if (!userId) return;
 
-        if (disconnectedUserId) {
-          onlineUsers.delete(disconnectedUserId);
-          console.log(`User ${disconnectedUserId} disconnected`);
-          io.emit("onlineUser:update", Array.from(onlineUsers.keys()));
+        const userData = onlineUsers.get(userId);
+        if (userData) {
+          // Notify all spaces the user was in
+          userData.spaces.forEach(spaceUuid => {
+            socket.to(`chat:${spaceUuid}`).emit('user_left', { userId });
+          });
+          
+          onlineUsers.delete(userId);
+          console.log(`User ${userId} disconnected`);
+          updateOnlineUsers();
         }
       });
+
+      // Helper function to get user ID by socket ID
+      function getUserIdBySocketId(socketId) {
+        for (const [userId, data] of onlineUsers.entries()) {
+          if (data.socketId === socketId) return userId;
+        }
+        return null;
+      }
+
+      // Update all clients about online users
+      function updateOnlineUsers() {
+        io.emit('online_users', Array.from(onlineUsers.keys()));
+      }
     });
 
     return io;

@@ -154,6 +154,7 @@ class SpaceController {
         const result = await this.space.getAllFriendSpaces(account_id);
 
         const spaces = result.map(item => ({
+            space_id: item.space_id,
             space_uuid: item.space_uuid,
             space_link: `${process.env.NODE_ENV === 'production'
                     ? 'https://immaculearnapi-template-production.up.railway.app' 
@@ -191,6 +192,7 @@ class SpaceController {
             const result = await this.space.getAllSpace(account_id);
 
             const spaces = result.map(item => ({
+                space_id: item.space_id,
                 space_uuid: item.space_uuid,
                 space_link: `${process.env.NODE_ENV === 'production'
                         ? 'https://immaculearnapi-template-production.up.railway.app' 

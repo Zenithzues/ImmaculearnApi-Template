@@ -1,46 +1,142 @@
-# Backend Functionality for Immaculearn Thesis Project
+# Immaculearn API
 
-## Getting Started
+Backend API for the Immaculearn educational platform. This API provides the necessary endpoints for user authentication, course management, and other core functionalities of the Immaculearn application.
 
-### Requirements
+## 🚀 Getting Started
 
-- Node: `^18`
-- NPM: `^10.7.0`
+### Prerequisites
 
-### Local Development
+- Node.js 18 or higher
+- npm 10.7.0 or higher
+- MySQL 8.0 or higher
+- Cloudinary account (for file storage)
+- Supabase account (for authentication)
+- Firebase Admin SDK credentials (if using Firebase services)
 
-1. Install dependencies
-```sh
-npm install
-```
+### 📦 Installation
 
-2. Create `.env`
+1. Clone the repository:
+   ```sh
+   git clone [repository-url]
+   cd ImmaculearnApi-Template
+   ```
 
-**Important!** DO NOT COMMIT THIS FILE
-```env
-PORT=3000
-API_KEY={public_key}
-API_SECRET_KEY={private_key}
+2. Install dependencies:
+   ```sh
+   npm install
+   ```
 
-DB_HOST=localhost
-DB_USER=root
-DB_PASS=example
-DB_NAME=api
-```
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   ```env
+   # Server Configuration
+   PORT=3000
+   NODE_ENV=development
+   
+   # API Security
+   API_KEY=your_public_key
+   API_SECRET_KEY=your_private_key
+   JWT_SECRET=your_jwt_secret
+   
+   # Database Configuration
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=your_db_user
+   DB_PASS=your_db_password
+   DB_NAME=immaculearn_db
+   
+   # Cloudinary Configuration
+   CLOUDINARY_CLOUD_NAME=your_cloud_name
+   CLOUDINARY_API_KEY=your_cloudinary_key
+   CLOUDINARY_API_SECRET=your_cloudinary_secret
+   
+   # Supabase Configuration
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_KEY=your_supabase_key
+   
+   # Firebase Configuration (if applicable)
+   FIREBASE_PROJECT_ID=your_project_id
+   FIREBASE_PRIVATE_KEY=your_private_key
+   FIREBASE_CLIENT_EMAIL=your_client_email
+   ```
 
-3. Import database schema `db.sql`
+4. Database Setup:
+   - Import the database schema from `db.sql`
+   - Make sure your MySQL server is running
 
-4. Run development server
+### 🛠 Development
 
+Start the development server with hot-reload:
 ```sh
 npm run dev
 ```
 
-### Running example client-side
-
-```env
-npx serve public
+Build the application for production:
+```sh
+npm run build
 ```
+
+Start the production server:
+```sh
+npm start
+```
+
+## 📚 API Documentation
+
+### Authentication
+All protected routes require an API key and JWT token in the request headers.
+
+### Available Endpoints
+
+#### Authentication
+- `POST /v1/account/login` - User login
+- `POST /v1/account` - Create new account
+- `GET /v1/account` - Get account info
+
+#### Example Request
+```sh
+curl -X POST http://localhost:3000/v1/account/login \
+  -H "apikey: your_public_key" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser", "password":"password123"}'
+```
+
+## 🚀 Deployment
+
+### Production Deployment
+1. Build the application:
+   ```sh
+   npm run build
+   ```
+
+2. Start the production server:
+   ```sh
+   NODE_ENV=production npm start
+   ```
+
+### Using PM2 (Recommended for Production)
+```sh
+npm install -g pm2
+pm2 start dist/index.js --name "immaculearn-api"
+pm2 save
+pm2 startup
+```
+
+## 🔒 Environment Security
+- Never commit sensitive information to version control
+- Use environment variables for all configuration
+- Rotate API keys and secrets regularly
+- Enable HTTPS in production
+
+## 🤝 Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details
 
 
 ## Testing API Endpoints

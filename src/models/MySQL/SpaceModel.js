@@ -11,7 +11,7 @@ class Space {
 
   async getBySpaceUuid(space_uuid) {
     try {
-        const space = await this.db.query(
+        const space = await this.db.execute(
             `
             SELECT space_id, space_name, created_by FROM spaces
             WHERE space_uuid = ?
@@ -51,7 +51,7 @@ class Space {
       const query = `INSERT INTO spaces (space_uuid, space_name, description, created_by, created_at) VALUES (UUID(), ?, ?, ?, NOW())`;
       const result = await this.db.execute(query, [space_name, space_description , account_id]);
 
-      const row = await this.db.query(
+      const row = await this.db.execute(
             `SELECT space_uuid
             FROM spaces 
             WHERE space_id = ?
@@ -95,9 +95,10 @@ class Space {
 
   async getAllFriendSpaces(account_id) {
     try {
-        const rows = await this.db.query(
+        const rows = await this.db.execute(
             `
             SELECT 
+                sp.space_id,
                 sp.space_uuid,
                 sp.space_name,
                 sp.description,
@@ -160,9 +161,10 @@ class Space {
 
   async getAllSpace(account_id) {
     try {
-        const rows = await this.db.query(
+        const rows = await this.db.execute(
             `
             SELECT 
+                sp.space_id,
                 sp.space_uuid,
                 sp.space_name,
                 sp.description,
@@ -220,7 +222,7 @@ class Space {
     try {
 
         console.log(account_id, space_uuid)
-        const rows = await this.db.query(
+        const rows = await this.db.execute(
             `
             SELECT
                 a.account_id,
@@ -258,7 +260,7 @@ class Space {
         await this.db.getConnection();
         let query;
 
-        const space = await this.db.query(
+        const space = await this.db.execute(
             `
             SELECT space_id FROM spaces
             WHERE space_uuid = ? AND created_by = ?;

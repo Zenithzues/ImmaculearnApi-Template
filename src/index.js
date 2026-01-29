@@ -14,15 +14,19 @@ import './core/database.js';
 import initSocketIO from './core/socket.io.js';
 import { handleCRDTConnection } from './core/crdt.ws.js';
 
-const app = express();
-const port = process.env.PORT || 3000;
+const API_PORT = process.env.PORT || 3000;
+const CRDT_PORT = process.env.CRDT_PORT || 3001;
 
-/* ---------------- middlewares ---------------- */
+/* ---------------- EXPRESS + SOCKET.IO SERVER ---------------- */
+
+const app = express();
+const apiServer = http.createServer(app);
 
 app.use(morgan('combined'));
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+
 app.use(
   '/v1',
   cors({
@@ -32,47 +36,69 @@ app.use(
   v1
 );
 
-/* ---------------- http server ---------------- */
-
-const server = http.createServer(app);
-
-/* ---------------- socket.io ---------------- */
-
-const io = new SocketIOServer(server, {
+// Socket.IO
+const io = new SocketIOServer(apiServer, {
   cors: {
-    origin: "*",
+    origin: '*',
     credentials: true,
   },
-  transports: ["websocket", "polling"], // allow both
+  transports: ['websocket'], // 🔥 force websocket only
 });
 
 initSocketIO(io);
 
-/* ---------------- CRDT WebSocket ---------------- */
+apiServer.listen(API_PORT, () => {
+  console.log(`API + Socket.IO running on http://localhost:${API_PORT}`);
+});
 
-const wss = new WebSocketServer({ noServer: true });
+/* ---------------- CRDT WEBSOCKET SERVER ---------------- */
 
-server.on('upgrade', (req, socket, head) => {
-  const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+// In your main server file
+const crdtServer = http.createServer((req, res) => {
+  // Allow CORS for WebSocket connections
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+  
+  // Return server info
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    server: 'CRDT WebSocket Server',
+    status: 'running',
+    path: '/crdt',
+  }));
+});
 
-  if (pathname === '/crdt') {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
-  } else {
-    socket.destroy(); // very important
+// const wss = new WebSocketServer({ 
+//   server: crdtServer,
+//   // Accept connections on /crdt and subpaths
+//   path: '/crdt'
+// });
+
+const wss = new WebSocketServer({ 
+  server: crdtServer,
+  // Accept all paths under /crdt
+  path: '/crdt',
+  // Optional: verify client
+  verifyClient: (info) => {
+    // info.req.url could be /crdt/documents/<roomName>
+    return true;
   }
 });
 
+
 wss.on('connection', handleCRDTConnection);
 
-/* ---------------- start ---------------- */
-
-server.listen(port, () => {
-  console.log(`HTTP server running on http://localhost:${port}`);
-  console.log(`Socket.IO on /socket.io`);
-  console.log(`CRDT WebSocket on ws://localhost:${port}/crdt`);
+crdtServer.listen(CRDT_PORT, () => {
+  console.log(`CRDT WebSocket running on ws://localhost:${CRDT_PORT}/crdt`);
 });
+
 
 
 

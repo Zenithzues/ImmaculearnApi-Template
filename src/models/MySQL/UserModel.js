@@ -14,7 +14,7 @@ class User {
     //   this.logger.debug('Finding user by email', { email });
       
       // Check student emails first
-      const studentResult = await this.db.query(
+      const studentResult = await this.db.execute(
         `SELECT email FROM registered_student_emails WHERE email = ?`,
         [email]
       );
@@ -27,7 +27,7 @@ class User {
       }
 
       // If not found, check professor emails
-      const profResult = await this.db.query(
+      const profResult = await this.db.execute(
         `SELECT email FROM registered_prof_emails WHERE email = ?`,
         [email]
       );
@@ -392,7 +392,7 @@ class StudentFinder {
         LIMIT 1
       `;
       
-      const rows = await this.db.query(query, [account_id]);
+      const rows = await this.db.execute(query, [account_id]);
       
     //   if (rows[0]) {
     //     this.logger.debug('Found student by account ID', { account_id });
@@ -431,7 +431,7 @@ class ProfessorFinder {
         `;
         
         // FIX: Use execute instead of query
-        const rows = await this.db.query(query, [account_id]);
+        const rows = await this.db.execute(query, [account_id]);
         // this.logger.debug('Found professor by account ID', { rows });
         
         

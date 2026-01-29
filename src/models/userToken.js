@@ -40,7 +40,7 @@ export class UserToken {
   async update(userId, hashedRefresh) {
     // const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 days
-    return await this.db.query(
+    return await this.db.execute(
         `
         UPDATE tokens
         SET refresh_token = ?, expires_at = ?

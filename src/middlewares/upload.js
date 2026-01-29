@@ -8,29 +8,28 @@ const storage = new CloudinaryStorage({
     const folder = 'ImmacuLearn';
     const ext = file.originalname.split('.').pop();
     const baseName = file.originalname.replace(/\.[^/.]+$/, "");
-    // const userId = req.user ? req.user.id : 'guest';
 
-    let publicId = `${baseName}`;
+    let publicId = baseName;
     let counter = 0;
-    let exists = true;
 
-    while (exists) {
+    while (true) {
       try {
-        // check if file exists in folder
+        // check if file exists
         await cloudinary.api.resource(`${folder}/${publicId}`, { resource_type: 'raw' });
-        // file exists → increment counter
+        // exists → increment
         counter++;
         publicId = `${baseName}(${counter})`;
       } catch (err) {
-        // file does NOT exist → stop loop
-        exists = false;
+        // if file not found → break
+        if (err.http_code === 404) break;
+        else throw err; // rethrow other errors
       }
     }
 
     return {
       folder,
       resource_type: 'raw',
-      use_filename: false,
+      use_filename: false, // we handle filename with public_id
       public_id: publicId,
       format: ext,
     };

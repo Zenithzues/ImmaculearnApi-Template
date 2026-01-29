@@ -1,13 +1,29 @@
-.parcel-cache
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
 .env
-node_modules
-dist
 
+# Build output
+dist/
 
-# Firebase service account
+# Parcel
+.parcel-cache/
+
+# Temporary / runtime data
+src/data/tmp/*
+.ydoc-persistence/
+
+# Firebase / credentials (CRITICAL)
 src/core/serviceAccountKey.json
 src/core/serviceAccount_Immaculearn.json
 src/core/oauth_Immaculearn.json
 
-
-.ydoc-persistence
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

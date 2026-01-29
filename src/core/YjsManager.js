@@ -2,6 +2,7 @@
 import * as Y from 'yjs';
 import { hybridDatabase } from './HybridDatabase.js';
 import { Logger } from '../utils/Logger.js';
+import { YjsSupabaseStorage } from '../utils/YjsSupabaseStorage.js';
 
 export class YjsManager {
   constructor() {
@@ -9,6 +10,8 @@ export class YjsManager {
     this.documents = new Map(); // roomId -> Y.Doc
     this.awarenessStates = new Map(); // roomId -> Map<clientId, state>
     this.supabase = hybridDatabase.supabase;
+
+    this.storage = new YjsSupabaseStorage(supabaseClient);
   }
 
   async getOrCreateDocument(roomId) {
@@ -16,43 +19,17 @@ export class YjsManager {
       return this.documents.get(roomId);
     }
 
-    // Try to load from Supabase
-    let ydoc = new Y.Doc();
+    // Load from Supabase storage
+    const ydoc = await this.storage.getYDoc(roomId);
     
-    try {
-      const { data: savedDoc, error } = await this.supabase
-        .from('yjs_documents')
-        .select('yjs_content, version, metadata')
-        .eq('room_id', roomId)
-        .eq('document_name', 'collaboration')
-        .single();
-
-      if (!error && savedDoc?.yjs_content) {
-        // Convert base64 or buffer to Uint8Array
-        let update;
-        if (typeof savedDoc.yjs_content === 'string') {
-          update = Uint8Array.from(atob(savedDoc.yjs_content), c => c.charCodeAt(0));
-        } else if (Buffer.isBuffer(savedDoc.yjs_content)) {
-          update = new Uint8Array(savedDoc.yjs_content);
-        } else if (savedDoc.yjs_content instanceof Uint8Array) {
-          update = savedDoc.yjs_content;
-        } else {
-          update = new Uint8Array(Object.values(savedDoc.yjs_content));
-        }
-        
-        Y.applyUpdate(ydoc, update);
-        this.logger.info(`Loaded Yjs document for room ${roomId} from Supabase`);
-      }
-    } catch (error) {
-      this.logger.debug(`No existing Yjs document for room ${roomId}, creating new`);
-    }
-
     // Initialize document structures
     await this.initializeDocumentStructures(ydoc, roomId);
     
-    // Setup update persistence
+    // Listen for updates to persist
     ydoc.on('update', async (update, origin) => {
-      await this.persistDocumentUpdate(roomId, update);
+      if (origin !== 'server') { // Don't persist server-originated updates
+        await this.storage.storeUpdate(roomId, update);
+      }
     });
 
     this.documents.set(roomId, ydoc);
@@ -108,23 +85,31 @@ export class YjsManager {
   }
 
   async initializeDocumentStructures(ydoc, roomId) {
-    // Shared types
+    // Shared types for collaborative features
     ydoc.messages = ydoc.getArray('messages');
     ydoc.presence = ydoc.getMap('presence');
     ydoc.whiteboard = ydoc.getMap('whiteboard');
     ydoc.notes = ydoc.getText('notes');
     
-    // Metadata
-    ydoc.metadata = {
-      roomId,
-      version: 0,
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString()
-    };
+    // Initialize metadata if not exists
+    if (!ydoc.getMap('metadata')) {
+      ydoc.getMap('metadata').set('roomId', roomId);
+      ydoc.getMap('metadata').set('createdAt', new Date().toISOString());
+      ydoc.getMap('metadata').set('version', 0);
+    }
 
-    // Sync existing messages from Supabase
-    await this.syncMessagesFromSupabase(roomId, ydoc);
+    // Setup observers
+    ydoc.messages.observe(event => {
+      this.onMessagesChanged(roomId, event);
+    });
 
+    ydoc.presence.observe(event => {
+      this.onPresenceChanged(roomId, event);
+    });
+
+    // Initialize awareness map
+    this.awarenessStates.set(roomId, new Map());
+    
     return ydoc;
   }
 
@@ -156,6 +141,31 @@ export class YjsManager {
       this.logger.info(`Synced ${messages.length} messages from Supabase to Yjs for room ${roomId}`);
     } catch (error) {
       this.logger.error('Failed to sync messages from Supabase:', error);
+    }
+  }
+
+  async handleYjsUpdate(roomId, updateData, clientId) {
+    const ydoc = await this.getOrCreateDocument(roomId);
+    
+    if (!updateData || !updateData.update) {
+      this.logger.warn('Invalid update data received');
+      return null;
+    }
+
+    try {
+      const update = new Uint8Array(updateData.update);
+      
+      // Apply update to Yjs document
+      Y.applyUpdate(ydoc, update, clientId);
+      
+      // Persist to Supabase (will be done by the update listener)
+      
+      // Return the current state for broadcasting
+      const stateUpdate = Y.encodeStateAsUpdate(ydoc);
+      return Array.from(stateUpdate);
+    } catch (error) {
+      this.logger.error('Failed to apply Yjs update:', error);
+      throw error;
     }
   }
 

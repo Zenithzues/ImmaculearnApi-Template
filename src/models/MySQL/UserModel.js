@@ -99,7 +99,7 @@ class User {
     try {
       const query =
         'INSERT INTO accounts (email, google_id, profile_pic, created_at) VALUES (?, ?, ?, NOW())';
-      const [result] = await this.db.execute(query, [email, googleId, picture]);
+      const result = await this.db.execute(query, [email, googleId, picture]);
 
       this.logger.info('Created partial Google user', { email, googleId });
       
@@ -111,25 +111,51 @@ class User {
   }
 
   async completeStudentOnboarding(userId, data) {
-    const { f_name, l_name, birthdate, department_id, password } = data;
+    const { f_name, l_name, birthdate, gender, department_id, password, year_level } = data;
+    const gender_initial = gender?.charAt(0)
     
     const conn = await this.db.getConnection();
+
+    console.log(f_name, l_name, birthdate, gender_initial, department_id, password, year_level)
+
+    console.log(data)
     
     try {
       await conn.beginTransaction();
     //   this.logger.debug('Starting student onboarding transaction', { userId });
 
       // 1️⃣ Update accounts table (store password)
-      const hashedPassword = encryptPassword(password);
-      const updateAccountQuery = 'UPDATE accounts SET pswd = ? WHERE account_id = ?';
+      const hashedPassword = await hashPassword(password);
+
+      console.log(hashedPassword)
+      const updateAccountQuery = 'UPDATE accounts SET password = ? WHERE account_id = ?';
       await conn.execute(updateAccountQuery, [hashedPassword, userId]);
 
+      // const departmentResult = await this.db.execute(
+      //   "SELECT department_id FROM departments WHERE course_name = ?",
+      //   [department_id]
+      // );
+
+      // const department_id = departmentResult[0]?.department_id || null;
+
       // 2️⃣ Update students table (personal info)
+
+      // console.log("Hello world", userId)
       const updateStudentQuery = `
-        UPDATE students
-        SET f_name = ?, l_name = ?, birthdate = ?, department_id = ?
-        WHERE account_id = ?`;
-      await conn.execute(updateStudentQuery, [f_name, l_name, birthdate, department_id, userId]);
+        INSERT INTO students 
+          (account_id, student_fn, student_ln, student_bd, student_gender, student_course, student_yr_lvl)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      await conn.execute(updateStudentQuery, [
+        userId,
+        f_name,
+        l_name,
+        birthdate,
+        gender_initial,
+        department_id,
+        year_level
+      ]);
 
       await conn.commit();
       this.logger.info('Student onboarding completed', { userId });
@@ -142,6 +168,44 @@ class User {
       conn.release();
     }
   }
+
+  async completeProfessorOnboarding(userId, data) {
+    const { f_name, l_name, birthdate, department, gender, password } = data;
+
+    const conn = await this.db.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      // 1️⃣ Update password
+      const hashedPassword = encryptPassword(password);
+      await conn.execute(
+        'UPDATE accounts SET pswd = ? WHERE account_id = ?',
+        [hashedPassword, userId]
+      );
+
+      // 2️⃣ Update professor profile
+      await conn.execute(
+        `
+        UPDATE professors
+        SET prof_fn = ?, prof_ln = ?, prof_bd = ?, prof_gender = ?, prof_department = ?
+        WHERE account_id = ?
+        `,
+        [f_name, l_name, birthdate, gender, department, userId]
+      );
+
+      await conn.commit();
+      this.logger.info('Professor onboarding completed', { userId });
+
+    } catch (err) {
+      await conn.rollback();
+      this.logger.error('Professor onboarding failed', { userId, error: err });
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
 
 
   async getBySpaceId(space_id) {

@@ -28,7 +28,7 @@
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "docx": "^9.5.1",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
     "firebase-admin": "^13.6.0",

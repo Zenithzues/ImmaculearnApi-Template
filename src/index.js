@@ -55,45 +55,24 @@ apiServer.listen(API_PORT, () => {
 
 // In your main server file
 const crdtServer = http.createServer((req, res) => {
-  // Allow CORS for WebSocket connections
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
+  res.writeHead(200);
+  res.end('CRDT server running');
+});
+
+// Create WebSocket server without `path`
+const wss = new WebSocketServer({ noServer: true });
+
+crdtServer.on('upgrade', (req, socket, head) => {
+  // Accept only /crdt and any subpaths
+  if (!req.url.startsWith('/crdt')) {
+    socket.destroy();
     return;
   }
-  
-  // Return server info
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    server: 'CRDT WebSocket Server',
-    status: 'running',
-    path: '/crdt',
-  }));
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    handleCRDTConnection(ws, req);
+  });
 });
-
-// const wss = new WebSocketServer({ 
-//   server: crdtServer,
-//   // Accept connections on /crdt and subpaths
-//   path: '/crdt'
-// });
-
-const wss = new WebSocketServer({ 
-  server: crdtServer,
-  // Accept all paths under /crdt
-  path: '/crdt',
-  // Optional: verify client
-  verifyClient: (info) => {
-    // info.req.url could be /crdt/documents/<roomName>
-    return true;
-  }
-});
-
-
-wss.on('connection', handleCRDTConnection);
 
 crdtServer.listen(CRDT_PORT, () => {
   console.log(`CRDT WebSocket running on ws://localhost:${CRDT_PORT}/crdt`);

@@ -99,7 +99,7 @@ class User {
     try {
       const query =
         'INSERT INTO accounts (email, google_id, profile_pic, created_at) VALUES (?, ?, ?, NOW())';
-      const [result] = await this.db.execute(query, [email, googleId, picture]);
+      const result = await this.db.execute(query, [email, googleId, picture]);
 
       this.logger.info('Created partial Google user', { email, googleId });
       

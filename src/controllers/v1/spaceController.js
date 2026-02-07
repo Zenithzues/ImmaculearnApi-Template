@@ -153,6 +153,46 @@ class SpaceController {
 
         const result = await this.space.getAllFriendSpaces(account_id);
 
+        console.log(result)
+
+        const spaces = result.map(item => ({
+            space_id: item.space_id,
+            space_uuid: item.space_uuid,
+            space_link: `${process.env.NODE_ENV === 'production'
+                    ? 'https://immaculearnapi-template-production.up.railway.app' 
+                    : 'http://localhost:3000'}/space/j?t=${item.space_uuid}`,
+            space_name: item.space_name,
+            space_description: item.description,
+            creator: item.created_by,
+            members: item.members.map(member => ({
+                ...member,
+                full_name: maskFullName(member.full_name),
+                email: maskEmail(member.email)  // <-- mask email
+            }))
+        }));
+
+        // console.log(spaces)
+
+        res.json({
+            success: true,
+            message: "Successfully get all friends Spaces",
+            data: spaces
+        });
+
+        } catch (err) {
+            res.json({
+            success: false,
+            message: err.toString(),
+            });
+        }
+    }
+
+  async get_all_course_spaces(req, res) {
+    try {
+        const account_id = res.locals.account_id || 1;
+
+        const result = await this.space.getAllCourseSpaces(account_id);
+
         const spaces = result.map(item => ({
             space_id: item.space_id,
             space_uuid: item.space_uuid,

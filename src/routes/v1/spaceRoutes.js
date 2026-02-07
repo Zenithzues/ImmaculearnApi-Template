@@ -9,7 +9,7 @@ const spaceRouter = new Router();
 const space = new SpaceController();
 
 spaceRouter.use(authorization);
-spaceRouter.use(authentication);
+// spaceRouter.use(authentication);
 
 /**
  * Create Space
@@ -27,6 +27,11 @@ spaceRouter.get('/:space_uuid/join-requests', space.get_join_requests_by_space_i
  * Get All Friends Space
  */
 spaceRouter.get('/shared', space.get_all_friends_space.bind(space))
+
+/**
+ * Get All Prof Spaces
+ */
+spaceRouter.get('/course-spaces', space.get_all_course_spaces.bind(space))
 
 
 /**

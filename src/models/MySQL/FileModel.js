@@ -8,12 +8,12 @@ class FileModel {
   }
 
   // Create a new file record
-  async create({ space_id, owner_id, filename, content, path, cld_url, public_id, mimetype, size, status }) {
+  async create({ space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status }) {
     try {
       const result = await this.db.execute(
-        `INSERT INTO files (file_uuid, space_id, owner_id, filename, content, path, cld_url, public_id, mimetype, size, status, created_at)
-         VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [space_id, owner_id, filename, content, path, cld_url, public_id, mimetype, size, status]
+        `INSERT INTO files (file_uuid, space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status, created_at)
+         VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status]
       );
 
       const row = await this.db.execute(

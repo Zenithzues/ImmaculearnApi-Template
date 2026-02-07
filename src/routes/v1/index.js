@@ -7,6 +7,7 @@ import authRouter from './authRoutes.js';
 import uploadRouter from './upload.route.js';
 import chatRouter from './chatRoutes.js';
 import spaceRouter from './spaceRoutes.js';
+import taskRouter from './taskRoutes.js';
 
 const v1 = new Router();
 
@@ -16,6 +17,7 @@ v1.use('/files', fileRouter);
 v1.use('/api', uploadRouter);
 v1.use('/chat', chatRouter);
 v1.use('/spaces', spaceRouter);
+v1.use('/tasks', taskRouter);
 v1.use('/', homeRouter);
 
 export default v1;

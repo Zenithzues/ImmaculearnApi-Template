@@ -157,6 +157,119 @@ class Space {
   }
 
 
+  async getAllCourseSpaces(account_id) {
+    try {
+        const rows = await this.db.execute(
+        `
+        SELECT 
+            sp.space_id,
+            sp.space_uuid,
+            sp.space_name,
+            sp.description,
+            sp.created_by AS creator,
+
+            CONCAT('[', 
+                GROUP_CONCAT(
+                    CONCAT(
+                        '{"account_id":', acc.account_id,
+                        ',"email":"', IFNULL(acc.email, ''),
+                        '","profile_pic":"', IFNULL(acc.profile_pic, ''),
+                        '","full_name":"', IFNULL(
+                            COALESCE(
+                                CONCAT(st.student_fn, ' ', st.student_ln),
+                                CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                            ), ''
+                        ),
+                        '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd), ''),
+                        '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender), ''),
+                        '","course":"', IFNULL(st.student_course, ''),
+                        '","year_level":"', IFNULL(st.student_yr_lvl, ''),
+                        '","department":"', IFNULL(pr.prof_department, ''),
+                        '","role":"', CASE 
+                            WHEN acc.account_id = sp.created_by THEN 'creator'
+                            WHEN st.account_id IS NOT NULL THEN 'student'
+                            ELSE 'professor'
+                        END,
+                        '"}'
+                    )
+                    SEPARATOR ','
+                ), 
+            ']') AS members
+
+        FROM spaces sp
+
+        LEFT JOIN space_members spm
+            ON sp.space_id = spm.space_id 
+            AND spm.status = 'accepted'
+
+        LEFT JOIN accounts acc
+            ON acc.account_id = spm.account_id 
+            OR acc.account_id = sp.created_by   -- ensures creator is included
+
+        LEFT JOIN students st
+            ON acc.account_id = st.account_id
+
+        LEFT JOIN professors pr
+            ON acc.account_id = pr.account_id
+
+        WHERE sp.created_by = ?
+          AND EXISTS (
+              SELECT 1 
+              FROM professors p 
+              WHERE p.account_id = sp.created_by
+          )
+
+          -- Critical condition: no other professors in the space (except the creator)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM space_members sm
+              INNER JOIN professors p2 
+                  ON sm.account_id = p2.account_id
+              WHERE sm.space_id = sp.space_id
+                AND sm.status = 'accepted'
+                AND sm.account_id != sp.created_by
+          )
+
+        GROUP BY 
+            sp.space_id,
+            sp.space_uuid,
+            sp.space_name,
+            sp.description,
+            sp.created_by
+
+        ORDER BY sp.created_at DESC;   -- optional: most recent first
+        `,
+        [account_id]
+        );
+
+        // Safely parse the members JSON string into actual array
+        rows.forEach(space => {
+            try {
+                // Replace any invalid/empty GROUP_CONCAT result
+                const membersStr = space.members || '[]';
+                space.members = JSON.parse(membersStr);
+            } catch (e) {
+                space.members = [];
+                this.logger.warn('Failed to parse members JSON', { 
+                    space_id: space.space_id, 
+                    raw: space.members, 
+                    error: e.message 
+                });
+            }
+        });
+
+        return rows;
+
+    } catch (err) {
+        this.logger.error('Error Getting All Course Spaces (students-only)', { 
+            account_id, 
+            err: err.message || err 
+        });
+        throw err;
+    }
+  }
+
+
 
 
   async getAllSpace(account_id) {

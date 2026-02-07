@@ -15,6 +15,7 @@ dist/
 
 # Temporary / runtime data
 src/data/tmp/*
+src/data/*
 .ydoc-persistence/
 
 # Firebase / credentials (CRITICAL)

@@ -7,6 +7,6 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many login attempts. Please try again after 15 minutes.'
+    message: 'Too many login attempts. Please try again later'
   }
 });

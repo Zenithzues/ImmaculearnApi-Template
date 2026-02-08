@@ -14,11 +14,26 @@ class SpaceController {
 
   async create_space(req, res) {
     try {
-      const {space_name, space_description=""} = req.body || {};
+      const {space_name, space_description="", space_settings} = req.body || {};
+
+      // console.log(space_settings)
+
+      const defaultSettings = {
+        space_cover: null,
+        "max-member": 10
+      };
+
+      const settingsValue = space_settings
+      ? JSON.stringify(space_settings)
+      : JSON.stringify(defaultSettings);
 
       console.log(space_name, space_description)
 
-      const result = await this.space.createSpace(res.locals.account_id, space_name, space_description)
+      const account_id = res.locals.account_id || 1;
+
+      if (!account_id) return res.status(401).json({success: false, message: "UnAuthenticated User!"});
+
+      const result = await this.space.createSpace(account_id, space_name, space_description, settingsValue)
 
       // if (!result) res.json({ success: false, message: "Failed to create Space!"})
 

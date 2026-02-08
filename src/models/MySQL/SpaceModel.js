@@ -46,10 +46,10 @@ class Space {
     }
   }
 
-  async createSpace(account_id, space_name, space_description) {
+  async createSpace(account_id, space_name, space_description, space_settings) {
     try {
-      const query = `INSERT INTO spaces (space_uuid, space_name, description, created_by, created_at) VALUES (UUID(), ?, ?, ?, NOW())`;
-      const result = await this.db.execute(query, [space_name, space_description , account_id]);
+      const query = `INSERT INTO spaces (space_uuid, space_name, description, settings, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, NOW())`;
+      const result = await this.db.execute(query, [space_name, space_description, space_settings, account_id]);
 
       const row = await this.db.execute(
             `SELECT space_uuid

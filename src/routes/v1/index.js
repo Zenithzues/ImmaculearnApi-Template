@@ -8,6 +8,8 @@ import uploadRouter from './upload.route.js';
 import chatRouter from './chatRoutes.js';
 import spaceRouter from './spaceRoutes.js';
 import taskRouter from './taskRoutes.js';
+import regemailRouter from './registerstudentemailRoutes.js';
+import regprofemailRouter from './registerprofemailRoutes.js';
 
 const v1 = new Router();
 
@@ -19,5 +21,8 @@ v1.use('/chat', chatRouter);
 v1.use('/spaces', spaceRouter);
 v1.use('/tasks', taskRouter);
 v1.use('/', homeRouter);
+
+v1.use('/register_student', regemailRouter);
+v1.use('/register_prof', regprofemailRouter);
 
 export default v1;

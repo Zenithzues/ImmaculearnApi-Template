@@ -9,12 +9,17 @@ const spaceRouter = new Router();
 const space = new SpaceController();
 
 spaceRouter.use(authorization);
-// spaceRouter.use(authentication);
+spaceRouter.use(authentication);
 
 /**
  * Create Space
  */
 spaceRouter.post('/', space.create_space.bind(space));
+
+/**
+ * Get All Space Information by user id
+ */
+spaceRouter.get('/', space.get_all_space.bind(space))
 
 /**
  * Get All Space Information

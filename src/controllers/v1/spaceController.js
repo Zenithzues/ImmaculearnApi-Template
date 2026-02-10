@@ -168,7 +168,7 @@ class SpaceController {
 
         const result = await this.space.getAllFriendSpaces(account_id);
 
-        console.log(result)
+        // console.log(result)
 
         const spaces = result.map(item => ({
             space_id: item.space_id,

@@ -9,7 +9,7 @@ class Task {
     this.logger = new Logger('SpaceModel');
   }
 
-  async create(space_id, title, instruction, scoring, due_date, groupsData) {
+  async create(space_id, title, instruction, scoring, status, due_date, groupsData) {
     const conn = await this.db.getConnection();
 
     try {
@@ -17,8 +17,8 @@ class Task {
 
         // 1. Create Task
         const taskQuery = `
-        INSERT INTO tasks (space_id, task_title, task_instruction, task_score, task_due)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO tasks (space_id, task_title, task_instruction, task_score, task_status, task_due)
+        VALUES (?, ?, ?, ?, ?, ?)
         `;
 
         const [taskResult] = await conn.execute(taskQuery, [
@@ -26,6 +26,7 @@ class Task {
             title,
             instruction,
             scoring,
+            status,
             due_date
         ]);
 
@@ -76,6 +77,36 @@ class Task {
         throw err;
     } finally {
         conn.release();
+    }
+  }
+
+  async getUploadedTasksBySpaceId(space_id) {
+    try {
+        const uploadedQuery = `
+            SELECT task_id, task_title, task_instruction, task_score, task_status, task_due, created_at FROM tasks
+            WHERE space_id = ? AND task_status = ?
+        `
+        const result = await this.db.execute(uploadedQuery, [space_id, 'uploaded']);
+
+        return result
+    } catch(err) {
+        this.logger.error('Error getting Task ID', { space_id, err });
+        throw err;
+    }
+  }
+
+  async getDraftedTasksBySpaceId(space_id) {
+    try {
+        const draftedQuery = `
+            SELECT task_id, task_title, task_instruction, task_score, task_status, task_due, created_at FROM tasks
+            WHERE space_id = ? AND task_status = ?
+        `
+        const result = await this.db.execute(draftedQuery, [space_id, 'drafted']);
+
+        return result
+    } catch(err) {
+        this.logger.error('Error getting Task ID', { space_id, err });
+        throw err;
     }
   }
 

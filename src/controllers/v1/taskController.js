@@ -19,7 +19,7 @@ export class TaskController {
 
   async upload_task(req, res) {
     try {
-        const { space_id, title, instruction, scoring, due_date, groupsData } = req.body || {};
+        const { space_id, title, instruction, scoring, status, due_date, groupsData } = req.body || {};
 
         const account_id = res.locals.account_id || 1;
 
@@ -35,6 +35,7 @@ export class TaskController {
             title,
             instruction,
             scoring,
+            status,
             due_date,
             groupsData
         );
@@ -100,22 +101,58 @@ export class TaskController {
 
   async get_uploaded_tasks_by_space_id(req, res) {
     try {
+      const { space_id } = req.params;
 
-    } catch(err) {
-      res.status(400).json({
+      if (!space_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'space_id is required'
+        });
+      }
+
+      console.log(`Fetching tasks for space_id: ${space_id}`);
+
+      // TODO: Replace with real database call
+      const tasks = await this.task.getUploadedTasksBySpaceId(space_id); // Example placeholder
+
+      return res.json({
+        success: true,
+        data: tasks
+      });
+    } catch (err) {
+      console.error(`Error fetching tasks for space_id ${req.params.space_id}:`, err);
+      res.status(500).json({
         success: false,
-        message: err.message || 'Get all Uploaded tasks Failed.'
+        message: err.message || 'Failed to get uploaded tasks.'
       });
     }
   }
 
   async get_drafted_tasks_by_space_id(req, res) {
     try {
+      const { space_id } = req.params;
 
-    } catch(err) {
-      res.status(400).json({
+      if (!space_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'space_id is required'
+        });
+      }
+
+      console.log(`Fetching tasks for space_id: ${space_id}`);
+
+      // TODO: Replace with real database call
+      const tasks = await this.task.getDraftedTasksBySpaceId(space_id); // Example placeholder
+
+      return res.json({
+        success: true,
+        data: tasks
+      });
+    } catch (err) {
+      console.error(`Error fetching tasks for space_id ${req.params.space_id}:`, err);
+      res.status(500).json({
         success: false,
-        message: err.message || 'Get all Uploaded tasks Failed.'
+        message: err.message || 'Failed to get drafted tasks.'
       });
     }
   }

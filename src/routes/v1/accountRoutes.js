@@ -12,6 +12,7 @@ const account = new AccountController();
 accountRouter.get('/oauth/google/redirect', account.oauthGoogleRedirect.bind(account));
 accountRouter.get('/oauth/google/callback', account.oauthGoogleCallback.bind(account));
 accountRouter.post('/register', account.register.bind(account));
+accountRouter.post('/login', account.login.bind(account));
 accountRouter.use(authorization);
 
 // accountRouter.post('/login', account.login.bind(account));

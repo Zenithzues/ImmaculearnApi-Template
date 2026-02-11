@@ -387,26 +387,31 @@ class AccountController {
       const { email, password } = req.body || {};
 
       if (!email || !password) {
-        return res.status(400).json({ success: false, message: "Email and password required" });
+        return res.status(400).json({
+          success: false,
+          message: "Email and password required"
+        });
       }
 
-      // Verify user credentials
       const user = await this.user.verify(email, password);
 
       if (!user?.account_id) {
-        return res.status(401).json({ success: false, message: "Invalid email or password" });
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password"
+        });
       }
 
       const userId = user.account_id;
 
-      // Generate tokens
-      const accessToken = generateAccessToken(userId, role); // Implement your JWT access token function
-      const refreshToken = generateRefreshToken();     // Implement your JWT refresh token function
+      const accessToken = generateAccessToken(userId, user.role);
+      const refreshToken = generateRefreshToken();
 
-      // Hash refresh token before storing
-      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
 
-      // Save hashed refresh token in DB
       const existing = await this.userTokenModel.findByUserId(userId);
 
       if (existing) {
@@ -415,23 +420,42 @@ class AccountController {
         await this.userTokenModel.create(userId, hashedRefresh);
       }
 
-      // Optionally: emit a socket event for login
-      const io = socket.getIO();
-      io.emit("user:login", { userId, email });
+      const tempToken = jwtService.sign({ id: userId, email }, "15m");
 
-      // Return tokens to client
-      res.json({
-        success: true,
-        data: {
-          accessToken,
-          refreshToken, // send the plain refresh token to client; store only hashed version
-        },
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Strict",
+        maxAge: 15 * 60 * 1000,
       });
+
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: [
+          {
+            role: user.role,
+            needsOnboarding: user.needsOnboarding || false,
+            tempToken
+          }
+        ]
+      });
+
     } catch (err) {
       console.error("Login error:", err);
-      res.status(500).json({ success: false, message: err.toString() });
+      res.status(500).json({
+        success: false,
+        message: err.toString()
+      });
     }
   }
+
 
 
   /**

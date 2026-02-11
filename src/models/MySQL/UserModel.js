@@ -285,42 +285,45 @@ class User {
 
   async verify(email, password) {
     try {
+      const { email: registered_email, role: registered_role } = await this.findByEmail(email);
+
+      console.log(registered_email)
+      if (!registered_email) return null;
+
+
     //   this.logger.debug('Verifying user credentials', { email });
-      
-      const [results] = await this.db.execute(
-        'SELECT account_id, email, pswd as password FROM accounts WHERE email = ?',
-        [email],
+      const account = await this.db.execute(`
+          SELECT account_id, password FROM accounts
+          WHERE email = ?
+        `, [registered_email]
       );
 
-      if (!results[0]) {
-        this.logger.warn('User not found during verification', { email });
-        return null;
-      }
+      const isValid = await verifyPassword(account[0].password, password);
 
-      const storedHash = results[0].password;
-      
-      // Check which hash method was used
-      let isValid;
-      if (storedHash.startsWith('$argon2')) {
-        // Argon2 hash
-        isValid = await verifyPassword(storedHash, password);
-      } else {
-        // Assume bcrypt or other hash
-        // You'll need to implement this based on your encryptPassword function
-        isValid = await this.verifyLegacyPassword(password, storedHash);
-      }
 
       if (!isValid) {
         this.logger.warn('Invalid password', { email });
         return null;
       }
 
-      const user = results[0];
-      this.logger.info('User verification successful', { email, account_id: user.account_id });
+
+      
+      // Check which hash method was used
+      // let isValid;
+      // if (storedHash.startsWith('$argon2')) {
+      //   // Argon2 hash
+      //   isValid = await verifyPassword(storedHash, password);
+      // } else {
+      //   // Assume bcrypt or other hash
+      //   // You'll need to implement this based on your encryptPassword function
+      //   isValid = await this.verifyLegacyPassword(password, storedHash);
+      // }
+
+      this.logger.info('User verification successful', { email, account_id: account[0].account_id });
       
       return {
-        account_id: user.account_id,
-        email: user.email,
+        account_id: account[0].account_id,
+        role: registered_role,
       };
 
     } catch (err) {

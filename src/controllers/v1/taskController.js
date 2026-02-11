@@ -30,6 +30,8 @@ export class TaskController {
             });
         }
 
+        console.log(req.body)
+
         const result = await this.task.create(
             space_id,
             title,

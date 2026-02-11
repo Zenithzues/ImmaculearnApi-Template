@@ -70,6 +70,30 @@ class Space {
       throw error;
     }
   }
+  async createCourseSpace(account_id, space_name, space_description, space_settings) {
+    try {
+      const query = `INSERT INTO spaces (space_uuid, space_name, description, settings, space_type, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`;
+      const result = await this.db.execute(query, [space_name, space_description, space_settings, 'course', account_id]);
+
+      const row = await this.db.execute(
+            `SELECT space_uuid
+            FROM spaces 
+            WHERE space_id = ?
+            `,
+            [result.insertId]
+        );
+    //   this.logger.info('Created Space', { space_name, space_description, account_id });
+      
+      return { 
+            success: true, 
+            space_uuid: row[0].space_uuid,
+            insertId: result.insertId 
+        };
+    } catch (error) {
+      this.logger.error('Error creating course Space', { space_name, space_description, error });
+      throw error;
+    }
+  }
 
   async joinSpace(account_id, space_id) {
     try {
@@ -131,7 +155,7 @@ class Space {
                 ON acc.account_id = st.account_id
             LEFT JOIN professors pr
                 ON acc.account_id = pr.account_id
-            WHERE sp.created_by = ? OR EXISTS (
+            WHERE sp.space_type = 'normal' AND sp.created_by = ? OR EXISTS (
                 SELECT 1 FROM space_members sm 
                 WHERE sm.space_id = sp.space_id AND sm.account_id = ?
             )
@@ -166,7 +190,7 @@ class Space {
             sp.space_uuid,
             sp.space_name,
             sp.description,
-            sp.created_by AS creator,
+            sp.created_by,
 
             CONCAT('[', 
                 GROUP_CONCAT(
@@ -212,7 +236,7 @@ class Space {
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
 
-        WHERE sp.created_by = ?
+        WHERE sp.space_type = 'course' AND sp.created_by = ?
           AND EXISTS (
               SELECT 1 
               FROM professors p 
@@ -307,7 +331,7 @@ class Space {
                 ON acc.account_id = st.account_id
             LEFT JOIN professors pr
                 ON acc.account_id = pr.account_id
-            WHERE sp.created_by = ?
+            WHERE sp.space_type = 'normal' AND sp.created_by = ?
             GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,
             [account_id]

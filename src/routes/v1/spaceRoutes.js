@@ -16,6 +16,8 @@ spaceRouter.use(authentication);
  */
 spaceRouter.post('/', space.create_space.bind(space));
 
+spaceRouter.post('/course-space', space.create_course_space.bind(space));
+
 /**
  * Get All Space Information by user id
  */

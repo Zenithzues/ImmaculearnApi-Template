@@ -111,43 +111,58 @@ class User {
   }
 
   async completeStudentOnboarding(userId, data) {
-    const { f_name, l_name, birthdate, gender, department_id, password, year_level } = data;
-    const gender_initial = gender?.charAt(0)
-    
-    const conn = await this.db.getConnection();
+  const { f_name, l_name, birthdate, gender, department_id, password, year_level } = data;
 
-    console.log(f_name, l_name, birthdate, gender_initial, department_id, password, year_level)
+  if (!userId) throw new Error("User ID is required");
+  if (!password) throw new Error("Password is required");
 
-    console.log(data)
-    
-    try {
-      await conn.beginTransaction();
-    //   this.logger.debug('Starting student onboarding transaction', { userId });
+  const gender_initial = gender?.charAt(0)?.toUpperCase() || null;
 
-      // 1️⃣ Update accounts table (store password)
-      const hashedPassword = await hashPassword(password);
+  const conn = await this.db.getConnection();
 
-      console.log(hashedPassword)
-      const updateAccountQuery = 'UPDATE accounts SET password = ? WHERE account_id = ?';
-      await conn.execute(updateAccountQuery, [hashedPassword, userId]);
+  try {
+    await conn.beginTransaction();
 
-      // const departmentResult = await this.db.execute(
-      //   "SELECT department_id FROM departments WHERE course_name = ?",
-      //   [department_id]
-      // );
+    // 1️⃣ Check if account exists
+    const [account] = await conn.execute(
+      "SELECT account_id FROM accounts WHERE account_id = ?",
+      [userId]
+    );
 
-      // const department_id = departmentResult[0]?.department_id || null;
+    if (account.length === 0) {
+      throw new Error("Account does not exist");
+    }
 
-      // 2️⃣ Update students table (personal info)
+    // 2️⃣ Check if student already exists
+    const [existingStudent] = await conn.execute(
+      "SELECT account_id FROM students WHERE account_id = ?",
+      [userId]
+    );
 
-      // console.log("Hello world", userId)
-      const updateStudentQuery = `
-        INSERT INTO students 
-          (account_id, student_fn, student_ln, student_bd, student_gender, student_course, student_yr_lvl)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `;
+    if (existingStudent.length > 0) {
+      throw new Error("Student already onboarded");
+    }
 
-      await conn.execute(updateStudentQuery, [
+    // 3️⃣ Hash password
+    const hashedPassword = await hashPassword(password);
+
+    const [updateResult] = await conn.execute(
+      "UPDATE accounts SET password = ? WHERE account_id = ?",
+      [hashedPassword, userId]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      throw new Error("Failed to update account password");
+    }
+
+    // 4️⃣ Insert student profile
+    await conn.execute(
+      `
+      INSERT INTO students 
+      (account_id, student_fn, student_ln, student_bd, student_gender, student_course, student_yr_lvl)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
         userId,
         f_name,
         l_name,
@@ -155,56 +170,94 @@ class User {
         gender_initial,
         department_id,
         year_level
-      ]);
+      ]
+    );
 
-      await conn.commit();
-      this.logger.info('Student onboarding completed', { userId });
-      
-    } catch (err) {
-      await conn.rollback();
-      this.logger.error('Student onboarding failed', { userId, error: err });
-      throw err;
-    } finally {
-      conn.release();
-    }
+    await conn.commit();
+    this.logger.info("Student onboarding completed", { userId });
+
+  } catch (err) {
+    await conn.rollback();
+    this.logger.error("Student onboarding failed", { userId, error: err });
+    throw err;
+  } finally {
+    conn.release();
   }
+}
 
-  async completeProfessorOnboarding(userId, data) {
-    const { f_name, l_name, birthdate, department, gender, password } = data;
+async completeProfessorOnboarding(userId, data) {
+  const { f_name, l_name, birthdate, department, gender, password } = data;
 
-    const conn = await this.db.getConnection();
+  if (!userId) throw new Error("User ID is required");
+  if (!password) throw new Error("Password is required");
 
-    try {
-      await conn.beginTransaction();
+  const gender_initial = gender?.charAt(0)?.toUpperCase() || null;
 
-      // 1️⃣ Update password
-      const hashedPassword = encryptPassword(password);
-      await conn.execute(
-        'UPDATE accounts SET password = ? WHERE account_id = ?',
-        [hashedPassword, userId]
-      );
+  const conn = await this.db.getConnection();
 
-      // 2️⃣ Update professor profile
-      await conn.execute(
-        `
-        INSERT INTO professors
-        (account_id, prof_fn , prof_ln , prof_bd, prof_gender, prof_department )
-        VALUES (?, ?, ?, ?, ?, ?)
-        `,
-        [userId, f_name, l_name, birthdate, gender, department]
-      );
+  try {
+    await conn.beginTransaction();
 
-      await conn.commit();
-      this.logger.info('Professor onboarding completed', { userId });
+    // 1️⃣ Check if account exists
+    const [account] = await conn.execute(
+      "SELECT account_id FROM accounts WHERE account_id = ?",
+      [userId]
+    );
 
-    } catch (err) {
-      await conn.rollback();
-      this.logger.error('Professor onboarding failed', { userId, error: err });
-      throw err;
-    } finally {
-      conn.release();
+    if (account.length === 0) {
+      throw new Error("Account does not exist");
     }
+
+    // 2️⃣ Check if professor already exists
+    const [existingProfessor] = await conn.execute(
+      "SELECT account_id FROM professors WHERE account_id = ?",
+      [userId]
+    );
+
+    if (existingProfessor.length > 0) {
+      throw new Error("Professor already onboarded");
+    }
+
+    // 3️⃣ Hash password
+    const hashedPassword = await hashPassword(password);
+
+    const [updateResult] = await conn.execute(
+      "UPDATE accounts SET password = ? WHERE account_id = ?",
+      [hashedPassword, userId]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      throw new Error("Failed to update account password");
+    }
+
+    // 4️⃣ Insert professor profile
+    await conn.execute(
+      `
+      INSERT INTO professors
+      (account_id, prof_fn, prof_ln, prof_bd, prof_gender, prof_department)
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [
+        userId,
+        f_name,
+        l_name,
+        birthdate,
+        gender_initial,
+        department
+      ]
+    );
+
+    await conn.commit();
+    this.logger.info("Professor onboarding completed", { userId });
+
+  } catch (err) {
+    await conn.rollback();
+    this.logger.error("Professor onboarding failed", { userId, error: err });
+    throw err;
+  } finally {
+    conn.release();
   }
+}
 
 
 
@@ -250,38 +303,6 @@ class User {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  async create(email, password) {
-    try {
-      const hashedPassword = encryptPassword(password);
-      
-      const [results] = await this.db.execute(
-        'INSERT INTO accounts(email, pswd) VALUES (?, ?)',
-        [email, hashedPassword],
-      );
-
-      this.logger.info('User account created', { email, account_id: results.insertId });
-      
-      return results;
-    } catch (err) {
-      this.logger.error('Error creating user account', { email, error: err });
-      throw err;
-    }
-  }
 
   async verify(email, password) {
     try {

@@ -245,7 +245,9 @@ class SpaceController {
 
   async get_all_course_spaces(req, res) {
     try {
-        const account_id = res.locals.account_id || 1;
+        const account_id = res.locals.account_id;
+
+        if (!account_id) return res.status(401).json({success: false, message: "UnAuthenticated User!"})
 
         const result = await this.space.getAllCourseSpaces(account_id);
 
@@ -257,6 +259,7 @@ class SpaceController {
                     : 'http://localhost:3000'}/space/j?t=${item.space_uuid}`,
             space_name: item.space_name,
             space_description: item.description,
+            space_type: item.space_type,
             creator: item.created_by,
             members: item.members.map(member => ({
                 ...member,
@@ -269,7 +272,7 @@ class SpaceController {
 
         res.json({
             success: true,
-            message: "Successfully get all friends Spaces",
+            message: "Successfully get all course Spaces",
             data: spaces
         });
 

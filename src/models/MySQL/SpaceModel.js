@@ -190,6 +190,7 @@ class Space {
             sp.space_uuid,
             sp.space_name,
             sp.description,
+            sp.space_type,
             sp.created_by,
 
             CONCAT('[', 
@@ -236,7 +237,7 @@ class Space {
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
 
-        WHERE sp.space_type = 'course' AND sp.created_by = ?
+        WHERE sp.space_type = 'course'
           AND EXISTS (
               SELECT 1 
               FROM professors p 
@@ -254,6 +255,18 @@ class Space {
                 AND sm.account_id != sp.created_by
           )
 
+          AND (
+                sp.created_by = ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM space_members sm2
+                    WHERE sm2.space_id = sp.space_id
+                    AND sm2.account_id = ?
+                    AND sm2.status = 'accepted'
+                )
+            )
+
+
         GROUP BY 
             sp.space_id,
             sp.space_uuid,
@@ -263,7 +276,7 @@ class Space {
 
         ORDER BY sp.created_at DESC;   -- optional: most recent first
         `,
-        [account_id]
+        [account_id, account_id]
         );
 
         // Safely parse the members JSON string into actual array

@@ -16,8 +16,8 @@ accountRouter.post('/login', account.login.bind(account));
 accountRouter.use(authorization);
 
 // accountRouter.post('/login', account.login.bind(account));
-// accountRouter.post('/', account.create.bind(account));
-// accountRouter.get('/', authentication, account.profile.bind(account));
+accountRouter.post('/', account.create.bind(account));
+accountRouter.get('/', authentication, account.profile.bind(account));
 
 accountRouter.post('/:account_id/space', account.create_space.bind(account));
 accountRouter.get('/:account_id/space/:space_id', account.get_space_by_id.bind(account));

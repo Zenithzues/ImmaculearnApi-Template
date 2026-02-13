@@ -180,18 +180,18 @@ class User {
       // 1️⃣ Update password
       const hashedPassword = encryptPassword(password);
       await conn.execute(
-        'UPDATE accounts SET pswd = ? WHERE account_id = ?',
+        'UPDATE accounts SET password = ? WHERE account_id = ?',
         [hashedPassword, userId]
       );
 
       // 2️⃣ Update professor profile
       await conn.execute(
         `
-        UPDATE professors
-        SET prof_fn = ?, prof_ln = ?, prof_bd = ?, prof_gender = ?, prof_department = ?
-        WHERE account_id = ?
+        INSERT INTO professors
+        (account_id, prof_fn , prof_ln , prof_bd, prof_gender, prof_department )
+        VALUES (?, ?, ?, ?, ?, ?)
         `,
-        [f_name, l_name, birthdate, gender, department, userId]
+        [userId, f_name, l_name, birthdate, gender, department]
       );
 
       await conn.commit();

@@ -157,7 +157,7 @@ class Space {
                 ON acc.account_id = pr.account_id
             WHERE sp.space_type = 'normal' AND sp.created_by = ? OR EXISTS (
                 SELECT 1 FROM space_members sm 
-                WHERE sm.space_id = sp.space_id AND sm.account_id = ?
+                WHERE sm.space_id = sp.space_id AND sm.account_id = ? AND sm.status = "accepted"
             )
             GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,

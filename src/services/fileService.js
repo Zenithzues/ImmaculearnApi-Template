@@ -9,7 +9,7 @@ export async function createFile({
   title,
   space_id,
   owner_id,
-  // group_id,
+  group_id,
   content = ''
 }) {
   const fileModel = new FileModel();
@@ -32,7 +32,7 @@ export async function createFile({
   const file = await fileModel.create_file({
     space_id,
     owner_id,
-    // group_id,
+    group_id,
     filename,
     content,
     path: filePath,

@@ -1,126 +1,149 @@
-import { mysqlConnection } from '../../config/mysqlConnection.js';
-import { Logger } from '../../utils/Logger.js';
-import User from './UserModel.js';
+import { mysqlConnection } from "../../config/mysqlConnection.js";
+import { Logger } from "../../utils/Logger.js";
+import User from "./UserModel.js";
 
 class Space {
   constructor() {
     this.user = new User();
     this.db = mysqlConnection;
-    this.logger = new Logger('SpaceModel');
+    this.logger = new Logger("SpaceModel");
   }
 
   async getBySpaceUuid(space_uuid) {
     try {
-        const space = await this.db.execute(
-            `
+      const space = await this.db.execute(
+        `
             SELECT space_id, space_name, created_by FROM spaces
             WHERE space_uuid = ?
-            `, [space_uuid]
-        )
+            `,
+        [space_uuid],
+      );
 
-        return space
-    } catch(err) {
-        this.logger.error('Error getting Space ID', { space_uuid, err });
-        throw err;
+      return space;
+    } catch (err) {
+      this.logger.error("Error getting Space ID", { space_uuid, err });
+      throw err;
     }
   }
 
-
   async getBySpaceId(space_id) {
-    
     try {
-        const [result,] = await this.db.execute(
-            `
+      const [result] = await this.db.execute(
+        `
             SELECT space_uuid, space_name, description, created_by
             FROM spaces
             WHERE space_id = ?
             LIMIT 1
-            `, [space_id]
-        )
+            `,
+        [space_id],
+      );
 
-        return result || [];
-    } catch(err) {
-        // await this.db.rollback();
-        this.logger.error('Failed to get Space', { space_id })
-        throw err;
+      return result || [];
+    } catch (err) {
+      // await this.db.rollback();
+      this.logger.error("Failed to get Space", { space_id });
+      throw err;
     }
   }
 
   async createSpace(account_id, space_name, space_description, space_settings) {
     try {
       const query = `INSERT INTO spaces (space_uuid, space_name, description, settings, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, NOW())`;
-      const result = await this.db.execute(query, [space_name, space_description, space_settings, account_id]);
+      const result = await this.db.execute(query, [
+        space_name,
+        space_description,
+        space_settings,
+        account_id,
+      ]);
 
       const row = await this.db.execute(
-            `SELECT space_uuid
+        `SELECT space_uuid
             FROM spaces 
             WHERE space_id = ?
             `,
-            [result.insertId]
-        );
-    //   this.logger.info('Created Space', { space_name, space_description, account_id });
-      
-      return { 
-            success: true, 
-            space_uuid: row[0].space_uuid,
-            insertId: result.insertId 
-        };
+        [result.insertId],
+      );
+      //   this.logger.info('Created Space', { space_name, space_description, account_id });
+
+      return {
+        success: true,
+        space_uuid: row[0].space_uuid,
+        insertId: result.insertId,
+      };
     } catch (error) {
-      this.logger.error('Error creating Space', { space_name, space_description, error });
+      this.logger.error("Error creating Space", {
+        space_name,
+        space_description,
+        error,
+      });
       throw error;
     }
   }
-  async createCourseSpace(account_id, space_name, space_description, space_settings) {
+  async createCourseSpace(
+    account_id,
+    space_name,
+    space_description,
+    space_settings,
+  ) {
     try {
       const query = `INSERT INTO spaces (space_uuid, space_name, description, settings, space_type, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`;
-      const result = await this.db.execute(query, [space_name, space_description, space_settings, 'course', account_id]);
+      const result = await this.db.execute(query, [
+        space_name,
+        space_description,
+        space_settings,
+        "course",
+        account_id,
+      ]);
 
       const row = await this.db.execute(
-            `SELECT space_uuid
+        `SELECT space_uuid
             FROM spaces 
             WHERE space_id = ?
             `,
-            [result.insertId]
-        );
-    //   this.logger.info('Created Space', { space_name, space_description, account_id });
-      
-      return { 
-            success: true, 
-            space_uuid: row[0].space_uuid,
-            insertId: result.insertId 
-        };
+        [result.insertId],
+      );
+      //   this.logger.info('Created Space', { space_name, space_description, account_id });
+
+      return {
+        success: true,
+        space_uuid: row[0].space_uuid,
+        insertId: result.insertId,
+      };
     } catch (error) {
-      this.logger.error('Error creating course Space', { space_name, space_description, error });
+      this.logger.error("Error creating course Space", {
+        space_name,
+        space_description,
+        error,
+      });
       throw error;
     }
   }
 
   async joinSpace(account_id, space_id) {
     try {
-        // const space_id = await this.getSpaceId(space_uuid);
+      // const space_id = await this.getSpaceId(space_uuid);
 
-        const row = await this.db.execute(`
+      const row = await this.db.execute(
+        `
             INSERT INTO space_members (space_id, account_id, status)
             VALUES (?, ?, 'pending')
             ON DUPLICATE KEY UPDATE 
             status = IF(status = 'accepted', status, 'pending')
-        `, [space_id, account_id]);
+        `,
+        [space_id, account_id],
+      );
 
-
-        return row
-
-
-    } catch(err) {
-        this.logger.error('Error Joining Space', { account_id, space_id, err });
-        throw err;
+      return row;
+    } catch (err) {
+      this.logger.error("Error Joining Space", { account_id, space_id, err });
+      throw err;
     }
   }
 
-
   async getAllFriendSpaces(account_id) {
     try {
-        const rows = await this.db.execute(
-            `
+      const rows = await this.db.execute(
+        `
             SELECT 
                 sp.space_id,
                 sp.space_uuid,
@@ -161,29 +184,28 @@ class Space {
             )
             GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,
-            [account_id, account_id]
-        );
+        [account_id, account_id],
+      );
 
-        // Parse JSON members
-        rows.forEach(space => {
-            try {
-                space.members = JSON.parse(space.members || '[]');
-            } catch(e) {
-                space.members = [];
-            }
-        });
+      // Parse JSON members
+      rows.forEach((space) => {
+        try {
+          space.members = JSON.parse(space.members || "[]");
+        } catch (e) {
+          space.members = [];
+        }
+      });
 
-        return rows;
-    } catch(err) {
-        this.logger.error('Error Getting All Friend Spaces', { account_id, err });
-        throw err;
+      return rows;
+    } catch (err) {
+      this.logger.error("Error Getting All Friend Spaces", { account_id, err });
+      throw err;
     }
   }
 
-
   async getAllCourseSpaces(account_id) {
     try {
-        const rows = await this.db.execute(
+      const rows = await this.db.execute(
         `
         SELECT 
             sp.space_id,
@@ -276,43 +298,39 @@ class Space {
 
         ORDER BY sp.created_at DESC;   -- optional: most recent first
         `,
-        [account_id, account_id]
-        );
+        [account_id, account_id],
+      );
 
-        // Safely parse the members JSON string into actual array
-        rows.forEach(space => {
-            try {
-                // Replace any invalid/empty GROUP_CONCAT result
-                const membersStr = space.members || '[]';
-                space.members = JSON.parse(membersStr);
-            } catch (e) {
-                space.members = [];
-                this.logger.warn('Failed to parse members JSON', { 
-                    space_id: space.space_id, 
-                    raw: space.members, 
-                    error: e.message 
-                });
-            }
-        });
+      // Safely parse the members JSON string into actual array
+      rows.forEach((space) => {
+        try {
+          // Replace any invalid/empty GROUP_CONCAT result
+          const membersStr = space.members || "[]";
+          space.members = JSON.parse(membersStr);
+        } catch (e) {
+          space.members = [];
+          this.logger.warn("Failed to parse members JSON", {
+            space_id: space.space_id,
+            raw: space.members,
+            error: e.message,
+          });
+        }
+      });
 
-        return rows;
-
+      return rows;
     } catch (err) {
-        this.logger.error('Error Getting All Course Spaces (students-only)', { 
-            account_id, 
-            err: err.message || err 
-        });
-        throw err;
+      this.logger.error("Error Getting All Course Spaces (students-only)", {
+        account_id,
+        err: err.message || err,
+      });
+      throw err;
     }
   }
 
-
-
-
   async getAllSpace(account_id) {
     try {
-        const rows = await this.db.execute(
-            `
+      const rows = await this.db.execute(
+        `
             SELECT 
                 sp.space_id,
                 sp.space_uuid,
@@ -347,33 +365,30 @@ class Space {
             WHERE sp.space_type = 'normal' AND sp.created_by = ?
             GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,
-            [account_id]
-        );
+        [account_id],
+      );
 
-        // Parse members JSON safely
-        rows.forEach(space => {
-            try {
-                space.members = JSON.parse(space.members || '[]');
-            } catch(e) {
-                space.members = [];
-            }
-        });
+      // Parse members JSON safely
+      rows.forEach((space) => {
+        try {
+          space.members = JSON.parse(space.members || "[]");
+        } catch (e) {
+          space.members = [];
+        }
+      });
 
-        return rows;
+      return rows;
     } catch (err) {
-        this.logger.error('Error getting All Space', { account_id, err });
-        throw err;
+      this.logger.error("Error getting All Space", { account_id, err });
+      throw err;
     }
-  }   
-
-
+  }
 
   async getJoinRequestsBySpaceId(account_id, space_uuid) {
     try {
-
-        console.log(account_id, space_uuid)
-        const rows = await this.db.execute(
-            `
+      console.log(account_id, space_uuid);
+      const rows = await this.db.execute(
+        `
             SELECT
                 a.account_id,
                 a.profile_pic,
@@ -391,85 +406,113 @@ class Space {
             WHERE sp.created_by = ? 
                 AND sp.space_uuid = ?;
             `,
-            [account_id, space_uuid]
-        );
+        [account_id, space_uuid],
+      );
 
-        console.log(rows)
+      console.log(rows);
 
-        return rows;
-    } catch(err) {
-        this.logger.error('Error getting All Space', { account_id })
-        throw err;
+      return rows;
+    } catch (err) {
+      this.logger.error("Error getting All Space", { account_id });
+      throw err;
     }
   }
 
-
   async processJoinRequest(account_id, user_id, space_uuid, status) {
     try {
+      await this.db.getConnection();
+      let query;
 
-        await this.db.getConnection();
-        let query;
-
-        const space = await this.db.execute(
-            `
+      const space = await this.db.execute(
+        `
             SELECT space_id FROM spaces
             WHERE space_uuid = ? AND created_by = ?;
-            `, [space_uuid, account_id]
-        )
+            `,
+        [space_uuid, account_id],
+      );
 
-
-        if (status === "accepted") {
-            query = `
+      if (status === "accepted") {
+        query = `
             UPDATE space_members
             SET status = ?, added_at = NOW()
             WHERE space_id = ? AND account_id = ?
             `;
-        } else {
-            if (status === "declined") {
-                query = `
+      } else {
+        if (status === "declined") {
+          query = `
                 UPDATE space_members
                 SET status = ?, added_at = NOW()
                 WHERE space_id = ? AND account_id = ?
-                `
-            }
+                `;
         }
-        const row = await this.db.execute(query, [status, space[0].space_id, user_id]);
+      }
+      const row = await this.db.execute(query, [
+        status,
+        space[0].space_id,
+        user_id,
+      ]);
 
-        return { row, space_id: space[0].space_id, message: status === "accepted" ? "Accepted Request Successfully" : "Declined Request Successfully"}
-
-    } catch(err) {
-        this.logger.error('Error Processing Request to Join', { account_id })
-        throw err;
+      return {
+        row,
+        space_id: space[0].space_id,
+        message:
+          status === "accepted"
+            ? "Accepted Request Successfully"
+            : "Declined Request Successfully",
+      };
+    } catch (err) {
+      this.logger.error("Error Processing Request to Join", { account_id });
+      throw err;
     }
   }
 
   async deleteSpace(space_uuid) {
     try {
-        // Delete members
-        await this.db.execute(
+      // Delete members
+      await this.db.execute(
         "DELETE FROM space_members WHERE space_id = (SELECT space_id FROM spaces WHERE space_uuid = ?)",
-        [space_uuid]
-        );
+        [space_uuid],
+      );
 
-        // Delete tasks (optional)
-        // await this.db.execute(
-        // "DELETE FROM tasks WHERE space_id = (SELECT space_id FROM spaces WHERE space_uuid = ?)",
-        // [space_uuid]
-        // );
+      // Delete tasks (optional)
+      // await this.db.execute(
+      // "DELETE FROM tasks WHERE space_id = (SELECT space_id FROM spaces WHERE space_uuid = ?)",
+      // [space_uuid]
+      // );
 
-        // Delete the space itself
-        await this.db.execute("DELETE FROM spaces WHERE space_uuid = ?", [space_uuid]);
+      // Delete the space itself
+      await this.db.execute("DELETE FROM spaces WHERE space_uuid = ?", [
+        space_uuid,
+      ]);
 
-        return true;
-    } catch(err) {
-        console.error("Error deleting space:", err);
-        throw err;
+      return true;
+    } catch (err) {
+      console.error("Error deleting space:", err);
+      throw err;
     }
-    }
+  }
 
+  async removeUserFromSpace(user_id, space_id) {
+    const conn = await this.db.getConnection();
+    try {
+      await conn.beginTransaction();
+      // Delete members
+      const result = await conn.execute(
+        "DELETE FROM space_members WHERE account_id = ? and space_id = ?",
+        [user_id, space_id],
+      );
+
+      // Delete the space itself
+      await conn.commit();
+      return result;
+    } catch (err) {
+      await conn.rollback();
+      this.logger.error("Student onboarding failed", { user_id, error: err });
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
 }
-
-
-
 
 export default Space;

@@ -148,16 +148,16 @@ class Space {
                 ), ']') AS members
             FROM spaces sp
             LEFT JOIN space_members spm
-                ON sp.space_id = spm.space_id AND spm.status = 'accepted'
+                ON sp.space_id = spm.space_id AND spm.status = 'accepted' 
             LEFT JOIN accounts acc
                 ON acc.account_id = spm.account_id OR acc.account_id = sp.created_by
             LEFT JOIN students st
                 ON acc.account_id = st.account_id
             LEFT JOIN professors pr
                 ON acc.account_id = pr.account_id
-            WHERE sp.space_type = 'normal' AND sp.created_by = ? AND EXISTS (
+            WHERE sp.space_type = 'normal' AND sp.created_by = ? OR EXISTS (
                 SELECT 1 FROM space_members sm 
-                WHERE sm.space_id = sp.space_id AND sm.account_id = ? AND sm.status = "accepted"
+                WHERE sm.space_id = sp.space_id AND sm.account_id = ?
             )
             GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
             `,

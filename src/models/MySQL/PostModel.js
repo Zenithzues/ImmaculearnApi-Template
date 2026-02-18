@@ -164,7 +164,7 @@ class Post {
                 student_fn,
                 ln,
                 acc.profile_pic
-            ORDER BY p.created_at DESC;
+            ORDER BY p.created_at ASC;
 
             `,
         [parent_id],

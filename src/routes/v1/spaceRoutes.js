@@ -9,7 +9,7 @@ const spaceRouter = new Router();
 const space = new SpaceController();
 
 spaceRouter.use(authorization);
-// spaceRouter.use(authentication);
+spaceRouter.use(authentication);
 
 /**
  * Create Space

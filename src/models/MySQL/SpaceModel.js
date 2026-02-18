@@ -155,7 +155,7 @@ class Space {
                 ON acc.account_id = st.account_id
             LEFT JOIN professors pr
                 ON acc.account_id = pr.account_id
-            WHERE sp.space_type = 'normal' AND sp.created_by = ? OR EXISTS (
+            WHERE sp.space_type = 'normal' AND sp.created_by = ? AND EXISTS (
                 SELECT 1 FROM space_members sm 
                 WHERE sm.space_id = sp.space_id AND sm.account_id = ? AND sm.status = "accepted"
             )

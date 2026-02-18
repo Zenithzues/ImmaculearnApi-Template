@@ -29,7 +29,7 @@ export async function createFile({
   await fs.writeFile(filePath, content, 'utf8');
 
   // 2. save DB record
-  const file = await fileModel.create({
+  const file = await fileModel.create_file({
     space_id,
     owner_id,
     group_id,

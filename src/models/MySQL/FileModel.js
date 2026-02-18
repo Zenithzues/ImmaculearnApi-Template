@@ -7,35 +7,72 @@ class FileModel {
     this.logger = new Logger('FileModel');
   }
 
+
+
+
+
   // Create a new file record
-  async create({ space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status }) {
-    try {
-      const result = await this.db.execute(
-        `INSERT INTO files (file_uuid, space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status, created_at)
-         VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status]
-      );
-
-      const row = await this.db.execute(
-        `
-        SELECT file_uuid FROM files
-        WHERE file_id = ?
-        `, [result.insertId]
+  async create_file({ space_id, owner_id, filename, content, path, cld_url, public_id, mimetype, size, status }) {
+        try {
+          const result = await this.db.execute(
+      `INSERT INTO files (
+        file_uuid, space_id, owner_id, filename, content, path,
+        cld_url, public_id, mimetype, size, status, created_at
       )
+      VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [space_id ?? null, owner_id ?? null, filename ?? null, content ?? null, path ?? null, cld_url ?? null, public_id ?? null, mimetype ?? null, size ?? 0, status ?? 'local']
+    );
 
 
-      this.logger.info('File record created', { fileId: result.insertId });
+          const row = await this.db.execute(
+            `
+            SELECT file_uuid FROM files
+            WHERE file_id = ?
+            `, [result.insertId]
+          )
 
-      return {
-        file_id: result.insertId,
-        fuuid : row[0].file_uuid,
-        created_at: new Date(),
-      };
-    } catch (error) {
-      this.logger.error('Error creating file record', { error });
-      throw error;
-    }
-  }
+
+          this.logger.info('File record created', { fileId: result.insertId });
+
+          return {
+            file_id: result.insertId,
+            fuuid : row[0].file_uuid,
+            created_at: new Date(),
+          };
+        } catch (error) {
+          this.logger.error('Error creating file record', { error });
+          throw error;
+        }
+      }
+
+  // async create({ space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status }) {
+  //   try {
+  //     const result = await this.db.execute(
+  //       `INSERT INTO files (file_uuid, space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status, created_at)
+  //        VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+  //       [space_id, owner_id, group_id, filename, content, path, cld_url, public_id, mimetype, size, status]
+  //     );
+
+  //     const row = await this.db.execute(
+  //       `
+  //       SELECT file_uuid FROM files
+  //       WHERE file_id = ?
+  //       `, [result.insertId]
+  //     )
+
+
+  //     this.logger.info('File record created', { fileId: result.insertId });
+
+  //     return {
+  //       file_id: result.insertId,
+  //       fuuid : row[0].file_uuid,
+  //       created_at: new Date(),
+  //     };
+  //   } catch (error) {
+  //     this.logger.error('Error creating file record', { error });
+  //     throw error;
+  //   }
+  // }
 
   async saveDraft(fileId, content) {
     // just update DB

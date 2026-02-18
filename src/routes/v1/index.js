@@ -10,6 +10,7 @@ import spaceRouter from './spaceRoutes.js';
 import taskRouter from './taskRoutes.js';
 import regemailRouter from './registerstudentemailRoutes.js';
 import regprofemailRouter from './registerprofemailRoutes.js';
+import postRouter from './postRoutes.js';
 
 const v1 = new Router();
 
@@ -20,6 +21,7 @@ v1.use('/api', uploadRouter);
 v1.use('/chat', chatRouter);
 v1.use('/spaces', spaceRouter);
 v1.use('/tasks', taskRouter);
+v1.use('/post', postRouter);
 v1.use('/', homeRouter);
 
 v1.use('/register_student', regemailRouter);

@@ -288,6 +288,7 @@ export class AuthController {
 
       // Set new access token cookie
       res.cookie("accessToken", newAccessToken, {
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         sameSite: "Strict",
         maxAge: 15 * 60 * 1000, // 15 minutes

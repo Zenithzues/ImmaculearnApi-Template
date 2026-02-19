@@ -47,7 +47,7 @@ class AccountController {
 
       if (!code)
         return res.redirect(
-          "https://immaculearn-web.netlify.app//oauth/callback?error=oauth_failed",
+          "https://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
         );
 
       // Decode role from state
@@ -87,7 +87,7 @@ class AccountController {
 
       if (!result)
         return res.redirect(
-          "https://immaculearn-web.netlify.app//oauth/callback?error=not_registered",
+          "https://immaculearn-web.netlify.app/oauth/callback?error=not_registered",
         );
 
       const { user, role, tempToken, needsOnboarding } = result;
@@ -95,9 +95,9 @@ class AccountController {
       console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
 
       if (needsOnboarding) {
-        // return res.redirect(`https://immaculearn-web.netlify.app//onboarding?role=${role}`)
+        // return res.redirect(`https://immaculearn-web.netlify.app/onboarding?role=${role}`)
         return res.redirect(
-          `https://immaculearn-web.netlify.app//oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+          `https://immaculearn-web.netlify.app/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
 
         // New user → redirect to onboarding page with tempToken
@@ -153,18 +153,18 @@ class AccountController {
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
-          `https://immaculearn-web.netlify.app//oauth/callback?role=${role}&tempToken=${tempToken}`,
+          `https://immaculearn-web.netlify.app/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
       }
 
       // Existing user → generate JWT
       // const sessionToken = jwtService.sign({ id: user.id });
 
-      // return res.redirect("https://immaculearn-web.netlify.app//home");
+      // return res.redirect("https://immaculearn-web.netlify.app/home");
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
-        "https://immaculearn-web.netlify.app//oauth/callback?error=oauth_failed",
+        "https://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
       );
     }
   }
@@ -535,12 +535,10 @@ class AccountController {
       // Validate email is allowed
       const registered = await this.user.findByEmail(email);
       if (!registered || registered.role !== role) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Email is not authorized for this role",
-          });
+        return res.status(403).json({
+          success: false,
+          message: "Email is not authorized for this role",
+        });
       }
 
       // Complete onboarding

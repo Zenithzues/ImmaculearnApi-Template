@@ -1,12 +1,15 @@
-import crypto from 'crypto'
+import crypto from "crypto";
 // import User from '../../models/user.js';
-import socket from '../../core/socket.js';
-import jwtService from '../../services/jwtService.js';
-import axios from 'axios';
-import { generateAccessToken, generateRefreshToken } from '../../utils/tokens.js';
+import socket from "../../core/socket.js";
+import jwtService from "../../services/jwtService.js";
+import axios from "axios";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "../../utils/tokens.js";
 // import { UserToken } from '../../models/userToken.js';
-import { UserToken } from '../../models/MySQL/UserToken.js';
-import User from '../../models/MySQL/UserModel.js';
+import { UserToken } from "../../models/MySQL/UserToken.js";
+import User from "../../models/MySQL/UserModel.js";
 
 class AccountController {
   constructor() {
@@ -14,17 +17,12 @@ class AccountController {
     this.userTokenModel = new UserToken();
   }
 
-
   async oauthGoogleRedirect(req, res) {
     const role = req.query.role;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI;
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    console.log(redirectUri)
-    const scope = [
-      "openid",
-      "email",
-      "profile"
-    ].join(" ");
+    console.log(redirectUri);
+    const scope = ["openid", "email", "profile"].join(" ");
 
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -35,9 +33,9 @@ class AccountController {
       `&access_type=offline` +
       `&prompt=consent`;
 
-    console.log(authUrl)
+    console.log(authUrl);
 
-    const state = Buffer.from(JSON.stringify({ role })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ role })).toString("base64");
     return res.redirect(authUrl + `&state=${state}`);
   }
 
@@ -47,7 +45,10 @@ class AccountController {
       const code = req.query.code;
       // const state = req.query.state;
 
-      if (!code) return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed")
+      if (!code)
+        return res.redirect(
+          "https://immaculearn-web.netlify.app//oauth/callback?error=oauth_failed",
+        );
 
       // Decode role from state
       // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
@@ -62,7 +63,7 @@ class AccountController {
           redirect_uri: process.env.GOOGLE_REDIRECT_URI,
           grant_type: "authorization_code",
         },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       const { access_token } = tokenRes.data;
@@ -70,7 +71,7 @@ class AccountController {
       // Fetch Google profile
       const userInfoRes = await axios.get(
         "https://www.googleapis.com/oauth2/v3/userinfo",
-        { headers: { Authorization: `Bearer ${access_token}` } }
+        { headers: { Authorization: `Bearer ${access_token}` } },
       );
 
       const { sub: googleId, email, name, picture } = userInfoRes.data;
@@ -84,15 +85,20 @@ class AccountController {
         // role
       });
 
-      if (!result) return res.redirect("http://localhost:5173/oauth/callback?error=not_registered");
+      if (!result)
+        return res.redirect(
+          "https://immaculearn-web.netlify.app//oauth/callback?error=not_registered",
+        );
 
-      const { user, role, tempToken, needsOnboarding} = result;
+      const { user, role, tempToken, needsOnboarding } = result;
 
-      console.log("NEEEDSSS ON BOARDING:",needsOnboarding)
+      console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
 
       if (needsOnboarding) {
-        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
-        return res.redirect(`http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`);
+        // return res.redirect(`https://immaculearn-web.netlify.app//onboarding?role=${role}`)
+        return res.redirect(
+          `https://immaculearn-web.netlify.app//oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+        );
 
         // New user → redirect to onboarding page with tempToken
         // return res.json({
@@ -106,7 +112,7 @@ class AccountController {
       const accessToken = generateAccessToken(user.account_id, role);
       const refreshToken = generateRefreshToken();
 
-      console.log("REFRESH TOKEN GENERATED: ", refreshToken)
+      console.log("REFRESH TOKEN GENERATED: ", refreshToken);
 
       // const { account_id, googleId: google_id} = user;
 
@@ -114,9 +120,14 @@ class AccountController {
 
       // console.log(account_id, google_id)
 
-      console.log(user)
-      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
-      const existingToken = await this.userTokenModel.findByUserId(user.account_id);
+      console.log(user);
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+      const existingToken = await this.userTokenModel.findByUserId(
+        user.account_id,
+      );
 
       // console.log(existingToken)
 
@@ -126,73 +137,73 @@ class AccountController {
         await this.userTokenModel.create(user.account_id, hashedRefresh);
       }
 
-      
       if (user) {
-          // Set tokens in HTTP-only cookies
-          res.cookie("accessToken", accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
-            maxAge: 15 * 60 * 1000, // 15 minutes
-          });
-    
-          res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-          });
-          return res.redirect(`http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`);
+        // Set tokens in HTTP-only cookies
+        res.cookie("accessToken", accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "Strict",
+          maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+
+        res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "Strict",
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+        return res.redirect(
+          `https://immaculearn-web.netlify.app//oauth/callback?role=${role}&tempToken=${tempToken}`,
+        );
       }
 
       // Existing user → generate JWT
       // const sessionToken = jwtService.sign({ id: user.id });
 
-      // return res.redirect("http://localhost:5173/home");
-
-
+      // return res.redirect("https://immaculearn-web.netlify.app//home");
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
-      return res.redirect("http://localhost:5173/oauth/callback?error=oauth_failed");
+      return res.redirect(
+        "https://immaculearn-web.netlify.app//oauth/callback?error=oauth_failed",
+      );
     }
   }
-
 
   async findOrCreate({ googleId, email, name, picture }) {
     let user = await this.user.findByEmail(email);
 
+    console.log(user);
+    if (!user) return null;
 
-    console.log(user)
-    if (!user) return null
-    
     let role = user.role;
     let tempToken = null;
     let needsOnboarding = false;
 
     user = await this.user.findByGoogleId(googleId);
 
-    console.log(user)
+    console.log(user);
 
     if (!user) {
-
-
-
       const results = await this.user.findByEmail(email);
 
-      if (!results) return null
+      if (!results) return null;
 
-      console.log(results)
+      console.log(results);
 
-
-      const {email: existingEmail, role: fetchRole} = results;
+      const { email: existingEmail, role: fetchRole } = results;
       // console.log(existingEmail, fetchRole)
 
-      // if (!existingEmail) return 
+      // if (!existingEmail) return
       // Create partial account and profile based on role
-      user = await this.user.createPartialGoogleUser({ googleId, email: existingEmail, name, picture });
+      user = await this.user.createPartialGoogleUser({
+        googleId,
+        email: existingEmail,
+        name,
+        picture,
+      });
 
       // Generate temporary token for onboarding (short-lived, e.g., 15m)
-      tempToken = jwtService.sign({ id: user.account_id, email }, '15m');
+      tempToken = jwtService.sign({ id: user.account_id, email }, "15m");
       needsOnboarding = true;
       role = fetchRole;
     }
@@ -200,24 +211,25 @@ class AccountController {
     return { user, role, tempToken, needsOnboarding };
   }
 
-
   async create_space(req, res) {
     try {
-      const {space_name, space_description} = req.body || {};
-      const account_id = req.params.account_id || null
+      const { space_name, space_description } = req.body || {};
+      const account_id = req.params.account_id || null;
 
-      const result = await this.user.createSpace(account_id, space_name, space_description)
+      const result = await this.user.createSpace(
+        account_id,
+        space_name,
+        space_description,
+      );
 
       // if (!result) res.json({ success: false, message: "Failed to create Space!"})
-
 
       res.json({
         success: true,
         message: "Creating Space Successfully!",
         space_uuid: result.space_uuid,
-      })
-
-    } catch(err) {
+      });
+    } catch (err) {
       res.json({
         success: false,
         message: err.toString(),
@@ -229,12 +241,13 @@ class AccountController {
   async get_space_by_id(req, res) {
     try {
       // const {space_name, space_description} = req.body || {};
-      const {space_id} = req.params || {}
+      const { space_id } = req.params || {};
       // const space_id = req.query.space_id
 
       const result = await this.user.getBySpaceId(space_id);
 
-      if (result.length === 0) return res.json({success: true, message: "Can't find space"})
+      if (result.length === 0)
+        return res.json({ success: true, message: "Can't find space" });
 
       res.json({
         success: true,
@@ -242,15 +255,13 @@ class AccountController {
           space: {
             space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
             space_name: result.space_name,
-            space_description: result.description
-          }
-        }
+            space_description: result.description,
+          },
+        },
         // space_id: space_id,
         // account_id: account_id
-      })
-      
-
-    } catch(err) {
+      });
+    } catch (err) {
       res.json({
         success: false,
         message: err.toString(),
@@ -258,16 +269,6 @@ class AccountController {
       res.end();
     }
   }
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Create account controller
@@ -302,7 +303,14 @@ class AccountController {
 
       // 2️⃣ Validate role-specific fields
       if (role === "student") {
-        if (!first_name || !last_name || !birthdate || !gender || !course || !year_level) {
+        if (
+          !first_name ||
+          !last_name ||
+          !birthdate ||
+          !gender ||
+          !course ||
+          !year_level
+        ) {
           return res.status(400).json({
             success: false,
             message: "Incomplete student profile data",
@@ -354,7 +362,6 @@ class AccountController {
           account_id: accountId,
         },
       });
-
     } catch (err) {
       // Duplicate email (MySQL)
       if (err.code === "ER_DUP_ENTRY") {
@@ -373,7 +380,6 @@ class AccountController {
     }
   }
 
-
   /**
    *  Login Controller
    *
@@ -389,7 +395,7 @@ class AccountController {
       if (!email || !password) {
         return res.status(400).json({
           success: false,
-          message: "Email and password required"
+          message: "Email and password required",
         });
       }
 
@@ -398,7 +404,7 @@ class AccountController {
       if (!user?.account_id) {
         return res.status(401).json({
           success: false,
-          message: "Invalid email or password"
+          message: "Invalid email or password",
         });
       }
 
@@ -442,21 +448,18 @@ class AccountController {
           {
             role: user.role,
             needsOnboarding: user.needsOnboarding || false,
-            tempToken
-          }
-        ]
+            tempToken,
+          },
+        ],
       });
-
     } catch (err) {
       console.error("Login error:", err);
       res.status(500).json({
         success: false,
-        message: err.toString()
+        message: err.toString(),
       });
     }
   }
-
-
 
   /**
    * Get user profile
@@ -476,10 +479,11 @@ class AccountController {
         data: {
           account_id: userInfo?.account_id,
           userEmail: userInfo?.email,
-        }
-      })
+        },
+      });
       res.end();
-    } catch (err) {a
+    } catch (err) {
+      a;
       res.json({
         success: false,
         message: err.toString(),
@@ -487,11 +491,12 @@ class AccountController {
     }
   }
 
-
   async register(req, res) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-      return res.status(401).json({ success: false, message: "Missing temp tokens" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Missing temp tokens" });
     }
 
     const token = authHeader.split(" ")[1];
@@ -500,7 +505,9 @@ class AccountController {
     try {
       decoded = jwtService.verify(token);
     } catch {
-      return res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid or expired token" });
     }
 
     const { id, email } = decoded;
@@ -520,17 +527,24 @@ class AccountController {
     try {
       // Validate required fields
       if (!email || !password || !role) {
-        return res.status(400).json({ success: false, message: "Missing required fields" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Missing required fields" });
       }
 
       // Validate email is allowed
       const registered = await this.user.findByEmail(email);
       if (!registered || registered.role !== role) {
-        return res.status(403).json({ success: false, message: "Email is not authorized for this role" });
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: "Email is not authorized for this role",
+          });
       }
 
       // Complete onboarding
-      if (role === 'student') {
+      if (role === "student") {
         await this.user.completeStudentOnboarding(id, {
           f_name: first_name,
           l_name: last_name,
@@ -542,7 +556,7 @@ class AccountController {
         });
       }
 
-      if (role === 'professor') {
+      if (role === "professor") {
         await this.user.completeProfessorOnboarding(id, {
           f_name: first_name,
           l_name: last_name,
@@ -558,7 +572,10 @@ class AccountController {
       const refreshToken = generateRefreshToken();
 
       // Hash refresh token and store in DB
-      const hashedRefresh = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
       const existingToken = await this.userTokenModel.findByUserId(id);
       if (existingToken) {
         await this.userTokenModel.update(id, hashedRefresh);
@@ -586,14 +603,13 @@ class AccountController {
         success: true,
         message: "Onboarding completed",
       });
-
     } catch (err) {
       console.error("Onboarding error:", err);
-      return res.status(500).json({ success: false, message: "Failed to complete onboarding" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to complete onboarding" });
     }
   }
-
-
 }
 
 export default AccountController;

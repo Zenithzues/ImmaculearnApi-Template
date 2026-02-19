@@ -1,71 +1,61 @@
-import express from 'express';
-import http from 'http';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import bodyParser from 'body-parser';
-import morgan from 'morgan';
-import 'dotenv/config.js';
+import express from "express";
+import http from "http";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import bodyParser from "body-parser";
+import morgan from "morgan";
+import "dotenv/config.js";
 
-import { Server as SocketIOServer } from 'socket.io';
-import { WebSocketServer } from 'ws';
+import { Server as SocketIOServer } from "socket.io";
+import { WebSocketServer } from "ws";
 
-import v1 from './routes/v1/index.js';
-import './core/database.js';
-import initSocketIO from './core/socket.io.js';
-import { handleCRDTConnection } from './core/crdt.ws.js';
+import v1 from "./routes/v1/index.js";
+import "./core/database.js";
+import initSocketIO from "./core/socket.io.js";
+import { handleCRDTConnection } from "./core/crdt.ws.js";
 
-const API_PORT = process.env.PORT || 3000;
-const CRDT_PORT = process.env.CRDT_PORT || 3001;
+/* ================= CONFIG ================= */
 
-/* ---------------- EXPRESS + SOCKET.IO SERVER ---------------- */
+const PORT = process.env.PORT || 3000;
+
+/* ================= EXPRESS APP ================= */
 
 const app = express();
-const apiServer = http.createServer(app);
+const server = http.createServer(app);
 
-app.use(morgan('combined'));
+app.use(morgan("combined"));
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(
-  '/v1',
+  "/v1",
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   }),
-  v1
+  v1,
 );
 
-// Socket.IO
-const io = new SocketIOServer(apiServer, {
+/* ================= SOCKET.IO ================= */
+
+const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
+    origin: "*",
     credentials: true,
   },
-  transports: ['websocket'], // 🔥 force websocket only
+  transports: ["websocket"], // force websocket only
 });
 
 initSocketIO(io);
 
-apiServer.listen(API_PORT, () => {
-  console.log(`API + Socket.IO running on http://localhost:${API_PORT}`);
-});
+/* ================= CRDT WEBSOCKET ================= */
 
-/* ---------------- CRDT WEBSOCKET SERVER ---------------- */
-
-// In your main server file
-const crdtServer = http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('CRDT server running');
-});
-
-// Create WebSocket server without `path`
 const wss = new WebSocketServer({ noServer: true });
 
-crdtServer.on('upgrade', (req, socket, head) => {
-  // Accept only /crdt and any subpaths
-  if (!req.url.startsWith('/crdt')) {
-    socket.destroy();
+// Handle upgrade requests on SAME server
+server.on("upgrade", (req, socket, head) => {
+  if (!req.url || !req.url.startsWith("/crdt")) {
     return;
   }
 
@@ -74,27 +64,11 @@ crdtServer.on('upgrade', (req, socket, head) => {
   });
 });
 
-crdtServer.listen(CRDT_PORT, () => {
-  console.log(`CRDT WebSocket running on ws://localhost:${CRDT_PORT}/crdt`);
+/* ================= START SERVER ================= */
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // import express from 'express';
 // import cookieParser from 'cookie-parser';
@@ -112,7 +86,6 @@ crdtServer.listen(CRDT_PORT, () => {
 // const app = express();
 // const port = process.env.PORT || 3000;
 
-
 // app.use(morgan('combined'));
 // app.use(cookieParser());
 // app.use(bodyParser.json());
@@ -123,8 +96,6 @@ crdtServer.listen(CRDT_PORT, () => {
 // const server = http.createServer(app);
 // socket.init(server)
 
-
 // server.listen(port, () => {
 //   console.log(`App and running at port ${port}...`)
 // });
-

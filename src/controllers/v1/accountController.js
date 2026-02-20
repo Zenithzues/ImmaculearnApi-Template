@@ -25,7 +25,7 @@ class AccountController {
     const scope = ["openid", "email", "profile"].join(" ");
 
     const authUrl =
-      `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `http://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_type=code` +
@@ -47,10 +47,10 @@ class AccountController {
 
       if (!code)
         return res.redirect(
-          "https://localhost:5173/oauth/callback?error=oauth_failed",
+          "http://localhost:5173/oauth/callback?error=oauth_failed",
         );
       // return res.redirect(
-      //   "https://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
+      //   "http://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
       // );
 
       // Decode role from state
@@ -58,7 +58,7 @@ class AccountController {
 
       // Exchange code for access token
       const tokenRes = await axios.post(
-        "https://oauth2.googleapis.com/token",
+        "http://oauth2.googleapis.com/token",
         {
           code,
           client_id: process.env.GOOGLE_CLIENT_ID,
@@ -73,7 +73,7 @@ class AccountController {
 
       // Fetch Google profile
       const userInfoRes = await axios.get(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
+        "http://www.googleapis.com/oauth2/v3/userinfo",
         { headers: { Authorization: `Bearer ${access_token}` } },
       );
 
@@ -90,10 +90,10 @@ class AccountController {
 
       if (!result)
         return res.redirect(
-          "https://localhost:5173/oauth/callback?error=not_registered",
+          "http://localhost:5173/oauth/callback?error=not_registered",
         );
       // return res.redirect(
-      //   "https://immaculearn-web.netlify.app/oauth/callback?error=not_registered",
+      //   "http://immaculearn-web.netlify.app/oauth/callback?error=not_registered",
       // );
 
       const { user, role, tempToken, needsOnboarding } = result;
@@ -101,12 +101,12 @@ class AccountController {
       console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
 
       if (needsOnboarding) {
-        // return res.redirect(`https://immaculearn-web.netlify.app/onboarding?role=${role}`)
+        // return res.redirect(`http://immaculearn-web.netlify.app/onboarding?role=${role}`)
         return res.redirect(
-          `https://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+          `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
         // return res.redirect(
-        //   `https://immaculearn-web.netlify.app/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+        //   `http://immaculearn-web.netlify.app/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         // );
 
         // New user → redirect to onboarding page with tempToken
@@ -162,24 +162,24 @@ class AccountController {
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
-          `https://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
+          `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
         // return res.redirect(
-        //   `https://immaculearn-web.netlify.app/oauth/callback?role=${role}&tempToken=${tempToken}`,
+        //   `http://immaculearn-web.netlify.app/oauth/callback?role=${role}&tempToken=${tempToken}`,
         // );
       }
 
       // Existing user → generate JWT
       // const sessionToken = jwtService.sign({ id: user.id });
 
-      // return res.redirect("https://immaculearn-web.netlify.app/home");
+      // return res.redirect("http://immaculearn-web.netlify.app/home");
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
-        "https://localhost:5173/oauth/callback?error=oauth_failed",
+        "http://localhost:5173/oauth/callback?error=oauth_failed",
       );
       // return res.redirect(
-      //   "https://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
+      //   "http://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
       // );
     }
   }

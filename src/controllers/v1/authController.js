@@ -177,6 +177,7 @@ export class AuthController {
         secure: process.env.NODE_ENV === "production",
         samesite: "Strict",
         //samesite: "None",
+        //samesite: "None",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
@@ -294,6 +295,7 @@ export class AuthController {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         samesite: "Strict",
+        //samesite: "None",
         //samesite: "None",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
@@ -485,6 +487,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         samesite: "Strict",
+        //samesite: "None",
         //samesite: "None",
         maxAge: 15 * 60 * 1000,
       });

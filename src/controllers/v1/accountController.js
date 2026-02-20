@@ -25,7 +25,7 @@ class AccountController {
     const scope = ["openid", "email", "profile"].join(" ");
 
     const authUrl =
-      `http://accounts.google.com/o/oauth2/v2/auth?` +
+      `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_type=code` +
@@ -49,16 +49,13 @@ class AccountController {
         return res.redirect(
           "http://localhost:5173/oauth/callback?error=oauth_failed",
         );
-      // return res.redirect(
-      //   "http://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
-      // );
 
       // Decode role from state
       // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
 
       // Exchange code for access token
       const tokenRes = await axios.post(
-        "http://oauth2.googleapis.com/token",
+        "https://oauth2.googleapis.com/token",
         {
           code,
           client_id: process.env.GOOGLE_CLIENT_ID,
@@ -73,7 +70,7 @@ class AccountController {
 
       // Fetch Google profile
       const userInfoRes = await axios.get(
-        "http://www.googleapis.com/oauth2/v3/userinfo",
+        "https://www.googleapis.com/oauth2/v3/userinfo",
         { headers: { Authorization: `Bearer ${access_token}` } },
       );
 
@@ -92,22 +89,16 @@ class AccountController {
         return res.redirect(
           "http://localhost:5173/oauth/callback?error=not_registered",
         );
-      // return res.redirect(
-      //   "http://immaculearn-web.netlify.app/oauth/callback?error=not_registered",
-      // );
 
       const { user, role, tempToken, needsOnboarding } = result;
 
       console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
 
       if (needsOnboarding) {
-        // return res.redirect(`http://immaculearn-web.netlify.app/onboarding?role=${role}`)
+        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
         return res.redirect(
           `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
-        // return res.redirect(
-        //   `http://immaculearn-web.netlify.app/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
-        // );
 
         // New user → redirect to onboarding page with tempToken
         // return res.json({
@@ -151,36 +142,30 @@ class AccountController {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "None",
+          sameSite: "Strict",
           maxAge: 15 * 60 * 1000, // 15 minutes
         });
 
         res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "None",
+          sameSite: "Strict",
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
           `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
-        // return res.redirect(
-        //   `http://immaculearn-web.netlify.app/oauth/callback?role=${role}&tempToken=${tempToken}`,
-        // );
       }
 
       // Existing user → generate JWT
       // const sessionToken = jwtService.sign({ id: user.id });
 
-      // return res.redirect("http://immaculearn-web.netlify.app/home");
+      // return res.redirect("http://localhost:5173/home");
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
         "http://localhost:5173/oauth/callback?error=oauth_failed",
       );
-      // return res.redirect(
-      //   "http://immaculearn-web.netlify.app/oauth/callback?error=oauth_failed",
-      // );
     }
   }
 
@@ -446,14 +431,14 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "None",
+        sameSite: "Strict",
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "None",
+        sameSite: "Strict",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -600,14 +585,14 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "None",
+        sameSite: "Strict",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "None",
+        sameSite: "Strict",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 

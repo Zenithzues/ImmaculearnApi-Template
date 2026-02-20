@@ -1,102 +1,113 @@
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import { generateAccessToken } from '../../utils/tokens.js';
-import { UserToken } from '../../models/MySQL/UserToken.js';
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { generateAccessToken } from "../../utils/tokens.js";
+import { UserToken } from "../../models/MySQL/UserToken.js";
 // import User from '../../models/MySQL/UserModel.js';
-import { Logger } from '../../utils/Logger.js';
-import { hybridDatabase } from '../../core/HybridDatabase.js';
-import { Validator } from '../../utils/Validator.js';
-import User from '../../models/MySQL/UserModel.js';
-import Task from '../../models/MySQL/TaskModel.js';
-import { createFile } from '../../services/fileService.js';
+import { Logger } from "../../utils/Logger.js";
+import { hybridDatabase } from "../../core/HybridDatabase.js";
+import { Validator } from "../../utils/Validator.js";
+import User from "../../models/MySQL/UserModel.js";
+import Task from "../../models/MySQL/TaskModel.js";
+import { createFile } from "../../services/fileService.js";
 
 export class TaskController {
   constructor() {
     this.task = new Task();
-    this.logger = new Logger('TaskController');
+    this.logger = new Logger("TaskController");
   }
-
 
   async upload_task(req, res) {
     try {
-        const { space_id, title, instruction, scoring, status, due_date, groupsData } = req.body || {};
+      const {
+        space_id,
+        title,
+        instruction,
+        scoring,
+        status,
+        due_date,
+        groupsData,
+      } = req.body || {};
 
-        const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id || 1;
 
-        if (!space_id || !title || !instruction || !scoring || !due_date || !groupsData?.length) {
-            return res.status(401).json({
-                success: false,
-                message: "Missing criteria for task! Try again."
-            });
-        }
+      if (
+        !space_id ||
+        !title ||
+        !instruction ||
+        !scoring ||
+        !due_date ||
+        !groupsData?.length
+      ) {
+        return res.status(401).json({
+          success: false,
+          message: "Missing criteria for task! Try again.",
+        });
+      }
 
-        console.log(req.body)
+      console.log(req.body);
 
-        const result = await this.task.create(
-            space_id,
-            title,
-            instruction,
-            scoring,
-            status,
-            due_date,
-            groupsData
-        );
+      const result = await this.task.create(
+        space_id,
+        title,
+        instruction,
+        scoring,
+        status,
+        due_date,
+        groupsData,
+      );
 
-        if (!result.taskId || result.group_ids.length === 0) {
-            return res.status(400).json({
-                success: false, 
-                message: "Failed to Create Task."
-            });
-        }
+      if (!result.taskId || result.group_ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Failed to Create Task.",
+        });
+      }
 
-        const createdFiles = [];
-        
-        // Match each group with its corresponding group_id
-        for (let i = 0; i < groupsData.length; i++) {
-            const group = groupsData[i];
-            const groupId = result.group_ids[i]; // Get the matching group_id
-            
-            const file = await createFile({
-                title: group.group_name || `Group ${i + 1}`,
-                space_id,
-                owner_id: account_id,
-                group_id: groupId, // Use the specific group_id
-                content: instruction
-            });
+      const createdFiles = [];
 
-            createdFiles.push({
-                group: group.group_name || `Group ${i + 1}`,
-                file_id: file.file_id,
-                group_id: groupId
-            });
-        }
+      // Match each group with its corresponding group_id
+      for (let i = 0; i < groupsData.length; i++) {
+        const group = groupsData[i];
+        const groupId = result.group_ids[i]; // Get the matching group_id
 
-        return res.json({
-            success: true,
-            message: "Task Created Successfully!",
-            data: {
-                task_id: result.taskId,
-                title: title,
-                groups: createdFiles
-            }
+        const file = await createFile({
+          title: group.group_name || `Group ${i + 1}`,
+          space_id,
+          owner_id: account_id,
+          group_id: groupId, // Use the specific group_id
+          content: instruction,
         });
 
+        createdFiles.push({
+          group: group.group_name || `Group ${i + 1}`,
+          file_id: file.file_id,
+          group_id: groupId,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Task Created Successfully!",
+        data: {
+          task_id: result.taskId,
+          title: title,
+          groups: createdFiles,
+        },
+      });
     } catch (err) {
-        res.status(400).json({
-            success: false,
-            message: err.message || "Upload tasks Failed."
-        });
+      res.status(400).json({
+        success: false,
+        message: err.message || "Upload tasks Failed.",
+      });
     }
   }
 
-
   async draft_task(req, res) {
     try {
-
-    } catch(err) {
+    } catch (err) {
       res.status(400).json({
         success: false,
-        message: err.message || 'Draft tasks Failed.'
+        message: err.message || "Draft tasks Failed.",
       });
     }
   }
@@ -108,7 +119,7 @@ export class TaskController {
       if (!space_id) {
         return res.status(400).json({
           success: false,
-          message: 'space_id is required'
+          message: "space_id is required",
         });
       }
 
@@ -119,13 +130,16 @@ export class TaskController {
 
       return res.json({
         success: true,
-        data: tasks
+        data: tasks,
       });
     } catch (err) {
-      console.error(`Error fetching tasks for space_id ${req.params.space_id}:`, err);
+      console.error(
+        `Error fetching tasks for space_id ${req.params.space_id}:`,
+        err,
+      );
       res.status(500).json({
         success: false,
-        message: err.message || 'Failed to get uploaded tasks.'
+        message: err.message || "Failed to get uploaded tasks.",
       });
     }
   }
@@ -137,7 +151,7 @@ export class TaskController {
       if (!space_id) {
         return res.status(400).json({
           success: false,
-          message: 'space_id is required'
+          message: "space_id is required",
         });
       }
 
@@ -148,52 +162,54 @@ export class TaskController {
 
       return res.json({
         success: true,
-        data: tasks
+        data: tasks,
       });
     } catch (err) {
-      console.error(`Error fetching tasks for space_id ${req.params.space_id}:`, err);
+      console.error(
+        `Error fetching tasks for space_id ${req.params.space_id}:`,
+        err,
+      );
       res.status(500).json({
         success: false,
-        message: err.message || 'Failed to get drafted tasks.'
+        message: err.message || "Failed to get drafted tasks.",
       });
     }
   }
 
-//   async get_all_uploaded_tasks(req, res) {
-//     try {
+  //   async get_all_uploaded_tasks(req, res) {
+  //     try {
 
-//     } catch(err) {
-//       res.status(400).json({
-//         success: false,
-//         message: err.message || 'Get all Uploaded tasks Failed.'
-//       });
-//     }
-//   }
-  
-//   async get_all_drafted_tasks(req, res) {
-//     try {
+  //     } catch(err) {
+  //       res.status(400).json({
+  //         success: false,
+  //         message: err.message || 'Get all Uploaded tasks Failed.'
+  //       });
+  //     }
+  //   }
 
-//     } catch(err) {
-//       res.status(400).json({
-//         success: false,
-//         message: err.message || 'Get all Drafted tasks Failed.'
-//       });
-//     }
-//   }
+  //   async get_all_drafted_tasks(req, res) {
+  //     try {
 
+  //     } catch(err) {
+  //       res.status(400).json({
+  //         success: false,
+  //         message: err.message || 'Get all Drafted tasks Failed.'
+  //       });
+  //     }
+  //   }
 
   async register(req, res) {
-    const timer = this.logger.startTimer('register');
-    
+    const timer = this.logger.startTimer("register");
+
     try {
       const { email, password } = req.body;
-      
-      this.logger.info('Registration attempt', { email, ip: req.ip });
+
+      this.logger.info("Registration attempt", { email, ip: req.ip });
 
       if (!email || !password) {
         return res.status(400).json({
           success: false,
-          message: 'Email and password are required'
+          message: "Email and password are required",
         });
       }
 
@@ -202,7 +218,7 @@ export class TaskController {
       if (!emailCheck) {
         return res.status(400).json({
           success: false,
-          message: 'Email not registered as student or professor'
+          message: "Email not registered as student or professor",
         });
       }
 
@@ -211,7 +227,7 @@ export class TaskController {
       if (!emailValidation.valid) {
         return res.status(400).json({
           success: false,
-          message: emailValidation.message
+          message: emailValidation.message,
         });
       }
 
@@ -219,7 +235,8 @@ export class TaskController {
       if (!Validator.validatePassword(password)) {
         return res.status(400).json({
           success: false,
-          message: 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+          message:
+            "Password must be at least 8 characters with uppercase, lowercase, number, and special character",
         });
       }
 
@@ -229,68 +246,77 @@ export class TaskController {
 
       // 5. Sync user to Supabase
       await hybridDatabase.syncUserToSupabase(accountId.toString());
-      
+
       // 6. Generate tokens
       const accessToken = generateAccessToken(accountId, emailCheck.role);
-      const refreshToken = crypto.randomBytes(40).toString('hex');
-      const hashedRefresh = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const refreshToken = crypto.randomBytes(40).toString("hex");
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
 
       // 7. Store refresh token
       await this.userTokenModel.create(accountId, hashedRefresh);
 
       // 8. Set cookies
-      res.cookie('accessToken', accessToken, {
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Strict',
+        secure: process.env.NODE_ENV === "production",
+        samesite: "Strict",
+        //samesite: "None",
         maxAge: 15 * 60 * 1000,
       });
 
-      res.cookie('refreshToken', JSON.stringify({ 
-        refreshToken, 
-        role: emailCheck.role 
-      }), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Strict',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({
+          refreshToken,
+          role: emailCheck.role,
+        }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          samesite: "Strict",
+          //samesite: "None",
+          //samesite: "None",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        },
+      );
 
-      this.logger.userActivity(accountId, 'register', {
+      this.logger.userActivity(accountId, "register", {
         success: true,
         ip: req.ip,
         role: emailCheck.role,
-        userAgent: req.headers['user-agent']
+        userAgent: req.headers["user-agent"],
       });
 
       res.status(201).json({
         success: true,
-        message: 'Registration successful',
+        message: "Registration successful",
         data: {
           account_id: accountId,
           email: email,
-          role: emailCheck.role
-        }
+          role: emailCheck.role,
+        },
       });
-
     } catch (error) {
       this.logger.logError(error, {
-        operation: 'register',
+        operation: "register",
         email: req.body?.email,
-        ip: req.ip
+        ip: req.ip,
       });
 
       // Handle duplicate email error
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === "ER_DUP_ENTRY") {
         return res.status(400).json({
           success: false,
-          message: 'Email already registered'
+          message: "Email already registered",
         });
       }
 
       res.status(400).json({
         success: false,
-        message: error.message || 'Registration failed'
+        message: error.message || "Registration failed",
       });
     } finally {
       timer.end();

@@ -31,7 +31,8 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(
   "/v1",
   cors({
-    origin: process.env.CLIENT_URL || "https://immaculearn-web.netlify.app",
+    // origin: process.env.CLIENT_URL || "https://immaculearn-web.netlify.app",
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   }),
   v1,

@@ -5,10 +5,12 @@ import Space from "../../models/MySQL/SpaceModel.js";
 import { Logger } from "../../utils/Logger.js";
 import maskEmail from "../../utils/maskEmail.js";
 import maskFullName from "../../utils/maskFullName.js";
+import User from "../../models/MySQL/UserModel.js";
 
 class SpaceController {
   constructor() {
     this.space = new Space();
+    this.user = new User();
     this.logger = new Logger("SpaceController");
   }
 
@@ -150,18 +152,273 @@ class SpaceController {
     }
   }
 
-  async add_user_in_space_by_reg_email(req, res) {
+  async join_space_directly(req, res) {
     try {
-      res.json({
+      const account_id = res.locals.account_id || 24;
+      const { space_uuid } = req.body || {};
+
+      if (!space_uuid) {
+        return res.json({
+          success: false,
+          message: "Space UUID is required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      if (account_id === space[0].created_by) {
+        return res.json({
+          success: false,
+          message: "You cannot join your own space.",
+        });
+      }
+
+      await this.space.joinSpaceDirectly(account_id, space[0].space_id);
+
+      return res.json({
         success: true,
-        message: "Successfully Add User",
+        message: "Successfully joined the space.",
       });
     } catch (err) {
-      res.json({
+      return res.json({
         success: false,
-        message: err.toString(),
+        message: err.message,
       });
-      res.end();
+    }
+  }
+
+  async join_space_by_link(req, res) {
+    try {
+      const account_id = res.locals.account_id || 24;
+      const { space_uuid } = req.body || {};
+
+      if (!space_uuid) {
+        return res.json({
+          success: false,
+          message: "Space UUID is required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      if (account_id === space[0].created_by) {
+        return res.json({
+          success: false,
+          message: "You cannot join your own space.",
+        });
+      }
+
+      await this.space.joinSpaceByLink(account_id, space[0].space_id);
+
+      return res.json({
+        success: true,
+        message: "Request sent. Waiting for owner approval.",
+      });
+    } catch (err) {
+      return res.json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async get_join_space_by_link(req, res) {
+    try {
+      const { space_uuid } = req.params;
+
+      if (!space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Space UUID is required.",
+        });
+      }
+
+      // Get the space first
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space) {
+        return res.status(404).json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      // Only fetch pending link_request invitations for this space
+      const results = await this.space.getPendingLinkRequests(
+        space[0].space_id,
+      );
+
+      return res.json({
+        success: true,
+        message: "Successfully get all pending approvals",
+        data: results,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async get_all_join_space_by_link(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+
+      const { user_id } = req.query || {};
+
+      // if (account_id !== Number(user_id))
+      if (!space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Space UUID is required.",
+        });
+      }
+
+      // Get the space first
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space) {
+        return res.status(404).json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      // Only fetch pending link_request invitations for this space
+      const results = await this.space.getPendingLinkRequests(
+        space[0].space_id,
+      );
+
+      return res.json({
+        success: true,
+        message: "Successfully get all pending approvals",
+        data: results,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async accept_user_by_joining_link(req, res) {
+    try {
+      const owner_id = res.locals.account_id || 1;
+      const { space_uuid, invited_account_id } = req.body || {};
+
+      if (!space_uuid || !invited_account_id) {
+        return res.json({
+          success: false,
+          message: "Space UUID and invited account id are required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      // Only owner can approve
+      if (owner_id !== space[0].created_by) {
+        return res.json({
+          success: false,
+          message: "Only space owner can approve requests.",
+        });
+      }
+
+      await this.space.approveLinkJoinRequest(
+        space[0].space_id,
+        invited_account_id,
+      );
+
+      return res.json({
+        success: true,
+        message: "User approved successfully.",
+      });
+    } catch (err) {
+      return res.json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async add_user_in_space_by_reg_email(req, res) {
+    try {
+      const owner_id = res.locals.account_id || 1;
+      const { space_uuid, email } = req.body || {};
+
+      if (!space_uuid || !email) {
+        return res.json({
+          success: false,
+          message: "Space UUID and email are required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      const isVerified = await this.user.findByEmail(email);
+
+      if (!isVerified)
+        return res
+          .status(401)
+          .json({ success: false, message: "Email not Verified" });
+
+      // console.log(verifiedEmail);
+
+      // Only owner can invite
+      if (space[0].created_by !== owner_id) {
+        return res.json({
+          success: false,
+          message: "Only space owner can invite users.",
+        });
+      }
+
+      await this.space.inviteUserByEmail(owner_id, space[0].space_id, email);
+
+      return res.json({
+        success: true,
+        message: "Invitation sent successfully.",
+      });
+    } catch (err) {
+      return res.json({
+        success: false,
+        message: err.message,
+      });
     }
   }
 

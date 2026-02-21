@@ -46,9 +46,21 @@ spaceRouter.get("/course-spaces", space.get_all_course_spaces.bind(space));
  * User Join Space
  */
 spaceRouter.post("/join", space.joinSpace.bind(space));
+
+spaceRouter.post("/join-by-link", space.join_space_by_link.bind(space));
 spaceRouter.post(
-  "/:space_uuid/add-by-owner",
+  "/add-by-owner",
   space.add_user_in_space_by_reg_email.bind(space),
+);
+spaceRouter.patch("/join-direct/accept", space.join_space_directly.bind(space));
+spaceRouter.patch(
+  "/join-by-link/accept",
+  space.accept_user_by_joining_link.bind(space),
+);
+
+spaceRouter.get(
+  "/:space_uuid/join-by-link",
+  space.get_join_space_by_link.bind(space),
 );
 
 /**

@@ -608,6 +608,32 @@ class AccountController {
         .json({ success: false, message: "Failed to complete onboarding" });
     }
   }
+
+  async get_all_space_invites_by_account_id(req, res) {
+    try {
+      // const userInfo = await this.user.get(res.locals.account_id);
+
+      const account_id = res.locals.account_id || 1;
+      const userId = req.params.account_id;
+
+      console.log(userId, account_id);
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+      if (!userId || Number(userId) !== account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "Invalid Request" });
+
+      return res.json({ success: true, message: "Successfully Get Invites " });
+    } catch (err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
 }
 
 export default AccountController;

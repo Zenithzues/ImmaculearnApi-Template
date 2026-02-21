@@ -119,6 +119,236 @@ class Space {
     }
   }
 
+  async joinSpaceByLink(account_id, space_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // 1️⃣ Check if already a member
+      const [existingMember] = await connection.execute(
+        `SELECT 1 FROM space_members WHERE space_id = ? AND account_id = ?`,
+        [space_id, account_id],
+      );
+
+      if (existingMember.length) {
+        throw new Error("You are already a member of this space");
+      }
+
+      // 2️⃣ Check if an invitation already exists
+      const [existingInvite] = await connection.execute(
+        `SELECT invitation_id FROM space_invitations
+       WHERE space_id = ? 
+         AND invited_account_id = ? 
+         AND join_type = 'link_request'`,
+        [space_id, account_id],
+      );
+
+      if (existingInvite.length) {
+        // 3️⃣ Update existing invitation to pending
+        await connection.execute(
+          `UPDATE space_invitations
+         SET invitation_status = 'pending', invited_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
+         WHERE invitation_id = ?`,
+          [existingInvite[0].invitation_id],
+        );
+      } else {
+        // 4️⃣ Create a new invitation
+        await connection.execute(
+          `INSERT INTO space_invitations
+         (space_id, invited_account_id, invited_by_account_id, join_type, invitation_status, invited_at, expires_at)
+         VALUES (?, ?, NULL, 'link_request', 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+          [space_id, account_id],
+        );
+      }
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error joining space by link", {
+        account_id,
+        space_id,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getPendingLinkRequests(space_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      const query = `
+      SELECT
+          si.invitation_id,
+          si.invited_account_id AS account_id,
+          si.invited_by_account_id AS owner_id,
+          si.invited_at,
+          si.expires_at,
+          a.profile_pic,
+          a.email,
+          CONCAT(st.student_fn, ' ', st.student_ln) AS fullname
+      FROM space_invitations si
+      LEFT JOIN accounts a
+          ON si.invited_account_id = a.account_id
+      LEFT JOIN students st
+          ON si.invited_account_id = st.account_id
+      WHERE si.space_id = ?
+        AND si.join_type = 'link_request'
+        AND si.invitation_status = 'pending'
+    `;
+
+      const [rows] = await connection.execute(query, [space_id]);
+
+      return rows; // array of pending invitations with student info
+    } catch (err) {
+      this.logger.error(
+        "Error fetching pending link requests with student info",
+        { space_id, err },
+      );
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async approveLinkJoinRequest(space_id, invited_account_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Find pending link request
+      const invites = await connection.execute(
+        `
+      SELECT * FROM space_invitations
+      WHERE space_id = ?
+        AND invited_account_id = ?
+        AND join_type = 'link_request'
+        AND invitation_status = 'pending'
+      LIMIT 1
+      `,
+        [space_id, invited_account_id],
+      );
+
+      if (!invites[0].length) {
+        throw new Error("No pending join request found");
+      }
+
+      const invitation = invites[0][0];
+
+      // Update invitation
+      await connection.execute(
+        `
+      UPDATE space_invitations
+      SET invitation_status = 'accepted',
+          accepted_at = NOW(),
+          owner_approved_at = NOW()
+      WHERE invitation_id = ?
+      `,
+        [invitation.invitation_id],
+      );
+
+      // Insert into space_members
+      await connection.execute(
+        `
+      INSERT INTO space_members (space_id, account_id, status)
+      VALUES (?, ?, 'accepted')
+      ON DUPLICATE KEY UPDATE status = 'accepted'
+      `,
+        [space_id, invited_account_id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error approving link request", {
+        space_id,
+        invited_account_id,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async inviteUserByEmail(owner_id, space_id, email) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Check if already a member
+      const members = await connection.execute(
+        `
+      SELECT sm.*, a.account_id 
+      FROM space_members sm
+      LEFT JOIN accounts a
+        ON a.account_id = sm.account_id
+      WHERE space_id = ? AND a.email = ?
+        
+      `,
+        [space_id, email],
+      );
+
+      if (members[0].length) {
+        throw new Error("User is already a member of this space");
+      }
+
+      // Check if invitation already exists
+      const existingInvite = await connection.execute(
+        `
+      SELECT * FROM space_invitations
+      WHERE space_id = ?
+        AND invited_email = ?
+        AND invitation_status = 'pending'
+      `,
+        [space_id, email],
+      );
+
+      if (existingInvite[0].length) {
+        throw new Error("Pending invitation already exists for this email");
+      }
+
+      // Insert invitation
+      await connection.execute(
+        `
+      INSERT INTO space_invitations
+      (
+        space_id,
+        invited_email,
+        invited_by_account_id,
+        join_type,
+        invitation_status,
+        invited_at,
+        expires_at
+      )
+      VALUES (?, ?, ?, 'direct', 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))
+      `,
+        [space_id, email, owner_id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error inviting user by email", {
+        owner_id,
+        space_id,
+        email,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   async joinSpace(account_id, space_id) {
     try {
       // const space_id = await this.getSpaceId(space_uuid);
@@ -137,6 +367,87 @@ class Space {
     } catch (err) {
       this.logger.error("Error Joining Space", { account_id, space_id, err });
       throw err;
+    }
+  }
+
+  async joinSpaceDirectly(account_id, space_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Get user email
+      const accounts = await connection.execute(
+        `SELECT email FROM accounts WHERE account_id = ?`,
+        [account_id],
+      );
+
+      if (!accounts[0].length) {
+        throw new Error("Account not found");
+      }
+
+      const email = accounts[0][0].email;
+
+      console.log(email);
+
+      // Find valid DIRECT invitation
+      const invites = await connection.execute(
+        `
+      SELECT *
+      FROM space_invitations
+      WHERE space_id = ?
+        AND join_type = 'direct'
+        AND invitation_status = 'pending'
+        AND expires_at > NOW()
+        AND (
+              invited_account_id = ?
+              OR invited_email = ?
+            )
+      LIMIT 1
+      `,
+        [space_id, account_id, email],
+      );
+
+      if (!invites[0].length) {
+        throw new Error("No valid direct invitation found");
+      }
+
+      const invitation = invites[0][0];
+
+      // Insert into space_members as accepted
+      await connection.execute(
+        `
+      INSERT INTO space_members (space_id, account_id, status)
+      VALUES (?, ?, 'accepted')
+      ON DUPLICATE KEY UPDATE status = 'accepted'
+      `,
+        [space_id, account_id],
+      );
+
+      // Update invitation
+      await connection.execute(
+        `
+      UPDATE space_invitations
+      SET invitation_status = 'accepted',
+          accepted_at = NOW(),
+          owner_approved_at = NOW()
+      WHERE invitation_id = ?
+      `,
+        [invitation.invitation_id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error joining space directly", {
+        account_id,
+        space_id,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
     }
   }
 

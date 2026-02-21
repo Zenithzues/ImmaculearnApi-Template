@@ -25,10 +25,10 @@ accountRouter.use(authorization);
 accountRouter.post("/", account.create.bind(account));
 // accountRouter.get('/', authentication, account.profile.bind(account));
 
-accountRouter.get(
-  "/:account_id/spaces/invites",
-  account.get_all_space_invites_by_account_id.bind(account),
-);
+// accountRouter.get(
+//   "/:account_id/spaces/invites",
+//   account.get_all_space_invites_by_account_id.bind(account),
+// );
 
 accountRouter.post("/:account_id/space", account.create_space.bind(account));
 accountRouter.get(

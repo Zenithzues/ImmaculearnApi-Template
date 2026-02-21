@@ -52,15 +52,37 @@ spaceRouter.post(
   "/add-by-owner",
   space.add_user_in_space_by_reg_email.bind(space),
 );
+
+/**
+ * ACCEPTING REQUEST TO JOIN IN SPACE //
+ */
 spaceRouter.patch("/join-direct/accept", space.join_space_directly.bind(space));
 spaceRouter.patch(
   "/join-by-link/accept",
   space.accept_user_by_joining_link.bind(space),
 );
 
+/**
+ * DECLINING REQUEST TO JOIN IN SPACE
+ */
+spaceRouter.patch("/join-direct/decline", space.decline_request.bind(space));
+spaceRouter.patch(
+  "/join-by-link/decline",
+  space.decline_space_invitation.bind(space),
+);
+
 spaceRouter.get(
   "/:space_uuid/join-by-link",
   space.get_join_space_by_link.bind(space),
+);
+
+spaceRouter.get(
+  "/pending-request/all",
+  space.get_all_join_space_by_link.bind(space),
+);
+spaceRouter.get(
+  "/pending-invitation/all",
+  space.get_all_space_invitations.bind(space),
 );
 
 /**

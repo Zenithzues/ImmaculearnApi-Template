@@ -154,7 +154,7 @@ class SpaceController {
 
   async join_space_directly(req, res) {
     try {
-      const account_id = res.locals.account_id || 24;
+      const account_id = res.locals.account_id || 12;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -196,7 +196,7 @@ class SpaceController {
 
   async join_space_by_link(req, res) {
     try {
-      const account_id = res.locals.account_id || 24;
+      const account_id = res.locals.account_id || 12;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -279,40 +279,41 @@ class SpaceController {
   async get_all_join_space_by_link(req, res) {
     try {
       const account_id = res.locals.account_id || 1;
-
       if (!account_id)
         return res
           .status(401)
           .json({ success: false, message: "UnAuthenticated User!" });
 
-      const { user_id } = req.query || {};
-
-      // if (account_id !== Number(user_id))
-      if (!space_uuid) {
-        return res.status(400).json({
-          success: false,
-          message: "Space UUID is required.",
-        });
-      }
-
-      // Get the space first
-      const space = await this.space.getBySpaceUuid(space_uuid);
-
-      if (!space) {
-        return res.status(404).json({
-          success: false,
-          message: "Invalid space.",
-        });
-      }
-
-      // Only fetch pending link_request invitations for this space
-      const results = await this.space.getPendingLinkRequests(
-        space[0].space_id,
-      );
+      const results = await this.space.getAllPendingLinkRequests(account_id);
 
       return res.json({
         success: true,
-        message: "Successfully get all pending approvals",
+        message: "Successfully fetched all pending approvals",
+        data: results,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async get_all_space_invitations(req, res) {
+    try {
+      const account_id = res.locals.account_id || 12;
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+
+      const results =
+        await this.space.getDirectInvitationsForAccount(account_id);
+
+      return res.json({
+        success: true,
+        message: "Successfully fetched all pending invitations for spaces",
         data: results,
       });
     } catch (err) {
@@ -357,6 +358,95 @@ class SpaceController {
         space[0].space_id,
         invited_account_id,
       );
+
+      return res.json({
+        success: true,
+        message: "User approved successfully.",
+      });
+    } catch (err) {
+      return res.json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async decline_request(req, res) {
+    try {
+      const owner_id = res.locals.account_id || 1;
+      const { space_uuid, invited_account_id } = req.body || {};
+
+      if (!space_uuid || !invited_account_id) {
+        return res.json({
+          success: false,
+          message: "Space UUID and invited account id are required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      // Only owner can approve
+      if (owner_id !== space[0].created_by) {
+        return res.json({
+          success: false,
+          message: "Only space owner can approve requests.",
+        });
+      }
+
+      await this.space.declineJoinRequest(
+        space[0].space_id,
+        invited_account_id,
+      );
+
+      return res.json({
+        success: true,
+        message: "Successfully Decline User.",
+      });
+    } catch (err) {
+      return res.json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
+  async decline_space_invitation(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      const { space_uuid } = req.body || {};
+
+      if (!space_uuid) {
+        return res.json({
+          success: false,
+          message: "Space UUID and invited account id are required.",
+        });
+      }
+
+      const space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || !space.length) {
+        return res.json({
+          success: false,
+          message: "Invalid space.",
+        });
+      }
+
+      // // Only owner can approve
+      // if (owner_id !== space[0].created_by) {
+      //   return res.json({
+      //     success: false,
+      //     message: "Only space owner can approve requests.",
+      //   });
+      // }
+
+      await this.space.declineSpaceInvitation(account_id, space[0].space_id);
 
       return res.json({
         success: true,

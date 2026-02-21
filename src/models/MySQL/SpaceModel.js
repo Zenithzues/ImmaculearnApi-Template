@@ -178,7 +178,7 @@ class Space {
   }
 
   async getPendingLinkRequests(space_id) {
-    const connection = await this.db.getConnection();
+    // const connection = await this.db.getConnection();
 
     try {
       const query = `
@@ -201,7 +201,7 @@ class Space {
         AND si.invitation_status = 'pending'
     `;
 
-      const [rows] = await connection.execute(query, [space_id]);
+      const rows = await this.db.execute(query, [space_id]);
 
       return rows; // array of pending invitations with student info
     } catch (err) {
@@ -210,8 +210,102 @@ class Space {
         { space_id, err },
       );
       throw err;
-    } finally {
-      connection.release();
+    }
+  }
+
+  async getAllPendingLinkRequests(account_id) {
+    try {
+      const query = `
+      SELECT
+          si.invitation_id,
+          si.invited_account_id AS account_id,
+          si.invited_by_account_id AS owner_id,
+          si.space_id,
+          sp.space_uuid,
+          si.invited_at,
+          si.expires_at,
+          a.profile_pic,
+          a.email,
+          CONCAT(st.student_fn, ' ', st.student_ln) AS fullname
+      FROM space_invitations si
+      INNER JOIN spaces sp
+          ON si.space_id = sp.space_id
+      LEFT JOIN accounts a
+          ON si.invited_account_id = a.account_id
+      LEFT JOIN students st
+          ON si.invited_account_id = st.account_id
+      WHERE sp.created_by = ?
+        AND si.join_type = 'link_request'
+        AND si.invitation_status = 'pending'
+    `;
+
+      const rows = await this.db.execute(query, [account_id]);
+
+      return rows; // array of all pending link_request invitations for spaces owned by account_id
+    } catch (err) {
+      this.logger.error(
+        "Error fetching all pending link requests with student info",
+        { account_id, err },
+      );
+      throw err;
+    }
+  }
+
+  async getDirectInvitationsForAccount(account_id) {
+    try {
+      // Get the email of the account
+      const accountRows = await this.db.execute(
+        `SELECT email FROM accounts WHERE account_id = ?`,
+        [account_id],
+      );
+
+      if (!accountRows.length) return []; // No account found
+
+      const account_email = accountRows[0].email;
+
+      // Get all pending direct invitations sent to this email
+      const query = `
+      SELECT
+          si.invitation_id,
+          si.space_id,
+          sp.space_uuid,
+          sp.space_name,
+          si.invited_by_account_id AS owner_id,
+          si.invited_at,
+          si.expires_at,
+          a.profile_pic AS owner_profile_pic,
+          a.email AS owner_email,
+            CASE 
+              WHEN st.account_id IS NOT NULL 
+                  THEN CONCAT(st.student_fn, ' ', st.student_ln)
+              WHEN pr.account_id IS NOT NULL 
+                  THEN CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+              ELSE NULL
+          END AS owner_fullname
+      FROM space_invitations si
+      INNER JOIN spaces sp
+          ON si.space_id = sp.space_id
+      LEFT JOIN accounts a
+          ON si.invited_by_account_id = a.account_id
+      LEFT JOIN students st
+          ON si.invited_by_account_id = st.account_id
+      LEFT JOIN professors pr
+          ON si.invited_by_account_id = pr.account_id
+      WHERE si.join_type = 'direct'
+        AND si.invitation_status = 'pending'
+        AND si.invited_email = ?
+      ORDER BY si.invited_at DESC
+    `;
+
+      const rows = await this.db.execute(query, [account_email]);
+
+      return rows;
+    } catch (err) {
+      this.logger.error(
+        "Error fetching direct invitations for account notifications",
+        { account_id, err },
+      );
+      throw err;
     }
   }
 
@@ -269,6 +363,125 @@ class Space {
       this.logger.error("Error approving link request", {
         space_id,
         invited_account_id,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async declineJoinRequest(space_id, invited_account_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Find pending link request
+      const invites = await connection.execute(
+        `
+      SELECT * FROM space_invitations
+      WHERE space_id = ?
+        AND invited_account_id = ?
+        AND join_type = 'link_request'
+        AND invitation_status = 'pending'
+      LIMIT 1
+      `,
+        [space_id, invited_account_id],
+      );
+
+      if (!invites[0].length) {
+        throw new Error("No pending join request found");
+      }
+
+      const invitation = invites[0][0];
+
+      // Update invitation
+      await connection.execute(
+        `
+      UPDATE space_invitations
+      SET invitation_status = 'declined',
+      WHERE invitation_id = ?
+      `,
+        [invitation.invitation_id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error declining request", {
+        space_id,
+        invited_account_id,
+        err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async declineSpaceInvitation(account_id, space_id) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Get user email
+      const accounts = await connection.execute(
+        `SELECT email FROM accounts WHERE account_id = ?`,
+        [account_id],
+      );
+
+      if (!accounts[0].length) {
+        throw new Error("Account not found");
+      }
+
+      const email = accounts[0][0].email;
+
+      console.log(email);
+
+      // Find valid DIRECT invitation
+      const invites = await connection.execute(
+        `
+      SELECT *
+      FROM space_invitations
+      WHERE space_id = ?
+        AND join_type = 'direct'
+        AND invitation_status = 'pending'
+        AND expires_at > NOW()
+        AND (
+              invited_account_id = ?
+              OR invited_email = ?
+            )
+      LIMIT 1
+      `,
+        [space_id, account_id, email],
+      );
+
+      if (!invites[0].length) {
+        throw new Error("No valid direct invitation found");
+      }
+
+      const invitation = invites[0][0];
+
+      // Update invitation
+      await connection.execute(
+        `
+      UPDATE space_invitations
+      SET invitation_status = 'declined',
+      WHERE invitation_id = ?
+      `,
+        [invitation.invitation_id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error joining space directly", {
+        account_id,
+        space_id,
         err,
       });
       throw err;

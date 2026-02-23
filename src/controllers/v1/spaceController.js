@@ -177,7 +177,15 @@ class SpaceController {
         });
       }
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      // Try to get space from regular spaces first
+      let space = await this.space.getBySpaceUuid(space_uuid);
+      let spaceType = "regular";
+
+      // If not found in regular spaces, try course spaces
+      if (!space || !space.length) {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+        spaceType = "course";
+      }
 
       if (!space || !space.length) {
         return res.json({
@@ -186,6 +194,10 @@ class SpaceController {
         });
       }
 
+      // Get the appropriate space_id based on type
+      const space_id = space[0].space_id;
+
+      // Check if user is the creator
       if (account_id === space[0].created_by) {
         return res.json({
           success: false,
@@ -193,11 +205,20 @@ class SpaceController {
         });
       }
 
-      await this.space.joinSpaceDirectly(account_id, space[0].space_id);
+      // Call joinSpaceDirectly with the space_id and let it handle the type internally
+      const result = await this.space.joinSpaceDirectly(account_id, space_id);
 
-      const io = getIO();
-      if (io) {
-        io.emit("accept_space_invitation");
+      // Only emit socket event if join was successful and result exists
+      if (result && result === true) {
+        try {
+          const io = getIO();
+          if (io && typeof io.emit === "function") {
+            io.emit("accept_space_invitation");
+          }
+        } catch (socketErr) {
+          // Log socket error but don't fail the request
+          console.error("Socket emission failed:", socketErr);
+        }
       }
 
       return res.json({
@@ -399,9 +420,15 @@ class SpaceController {
         });
       }
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      let space;
 
-      if (!space || !space.length) {
+      space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || space.length === 0) {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+      }
+
+      if (!space || space.length === 0) {
         return res.json({
           success: false,
           message: "Invalid space.",
@@ -445,9 +472,15 @@ class SpaceController {
         });
       }
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      let space;
 
-      if (!space || !space.length) {
+      space = await this.space.getBySpaceUuid(space_uuid);
+
+      if (!space || space.length === 0) {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+      }
+
+      if (!space || space.length === 0) {
         return res.json({
           success: false,
           message: "Invalid space.",

@@ -343,25 +343,44 @@ class Space {
             si.invited_account_id AS account_id,
             si.invited_by_account_id AS owner_id,
             COALESCE(si.space_id, si.c_space_id) AS space_id,
+            
             sp.space_uuid,
+            sp.space_name,
+            
+            csp.c_space_uuid,
+            csp.c_space_name,
+
+
             si.invited_at,
             si.expires_at,
             a.profile_pic,
             a.email,
             CONCAT(st.student_fn, ' ', st.student_ln) AS fullname
+
         FROM space_invitations si
-        INNER JOIN spaces sp
+
+        LEFT JOIN spaces sp
             ON si.space_id = sp.space_id
+
+        LEFT JOIN course_spaces csp
+            ON si.c_space_id = csp.c_space_id
+
         LEFT JOIN accounts a
             ON si.invited_account_id = a.account_id
+
         LEFT JOIN students st
             ON si.invited_account_id = st.account_id
-        WHERE sp.created_by = ?
-          AND si.join_type = 'link_request'
-          AND si.invitation_status = 'pending'
+
+        WHERE
+            (
+                sp.created_by = ?
+                OR csp.created_by = ?
+            )
+            AND si.join_type = 'link_request'
+            AND si.invitation_status = 'pending'
       `;
 
-      const rows = await this.db.execute(query, [account_id]);
+      const rows = await this.db.execute(query, [account_id, account_id]);
       return rows;
     } catch (err) {
       this.logger.error(
@@ -395,7 +414,7 @@ class Space {
             sp.space_uuid,
             sp.space_name,
             csp.c_space_uuid,
-            csp.c_space_name AS space_name,
+            csp.c_space_name,
             si.invited_by_account_id AS owner_id,
             si.invited_at,
             si.expires_at,

@@ -233,8 +233,14 @@ export class AuthController {
     try {
       const cookieVal =
         req.cookies.refreshToken && JSON.parse(req.cookies.refreshToken);
+      if (!cookieVal) {
+        return res.status(401).json({
+          success: false,
+          message: "No Token Found",
+        });
+      }
 
-      console.log(cookieVal);
+      // console.log(cookieVal);
       const { refreshToken, role } = cookieVal;
 
       // if (!refreshToken) {

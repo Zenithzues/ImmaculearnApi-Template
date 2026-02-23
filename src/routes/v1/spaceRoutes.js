@@ -65,11 +65,11 @@ spaceRouter.patch(
 /**
  * DECLINING REQUEST TO JOIN IN SPACE
  */
-spaceRouter.patch("/join-direct/decline", space.decline_request.bind(space));
 spaceRouter.patch(
-  "/join-by-link/decline",
+  "/join-direct/decline",
   space.decline_space_invitation.bind(space),
 );
+spaceRouter.patch("/join-by-link/decline", space.decline_request.bind(space));
 
 spaceRouter.get(
   "/:space_uuid/join-by-link",
@@ -94,7 +94,7 @@ spaceRouter.patch(
 );
 spaceRouter.patch(
   "/:space_uuid/decline/:user_id",
-  space.process_join_request_by_user_id.bind(space),
+  space.decline_request.bind(space),
 );
 // spaceRouter.get('/:space_id', space.get_space_by_id.bind(space));
 

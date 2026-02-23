@@ -264,7 +264,7 @@ export class TaskController {
         secure: process.env.NODE_ENV === "production",
         samesite: "Strict",
         //samesite: "None",
-        maxAge: 15 * 60 * 1000,
+        maxAge: 1 * 60 * 1000,
       });
 
       res.cookie(

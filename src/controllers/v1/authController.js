@@ -175,9 +175,9 @@ export class AuthController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        samesite: "Strict",
-        //samesite: "None",
-        //samesite: "None",
+        sameSite: "Strict",
+        //sameSite: "None",
+        //sameSite: "None",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
@@ -190,9 +190,9 @@ export class AuthController {
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          samesite: "Strict",
-          //samesite: "None",
-          //samesite: "None",
+          sameSite: "Strict",
+          //sameSite: "None",
+          //sameSite: "None",
           maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         },
       );
@@ -234,14 +234,16 @@ export class AuthController {
       const cookieVal =
         req.cookies.refreshToken && JSON.parse(req.cookies.refreshToken);
 
-      if (!cookieVal) {
-        return res.status(401).json({
-          success: false,
-          message: "Refresh token not found",
-        });
-      }
-
+      console.log(cookieVal);
       const { refreshToken, role } = cookieVal;
+
+      // if (!refreshToken) {
+      //   return res.status(401).json({
+      //     success: false,
+      //     message: "Refresh token not found",
+      //   });
+      // }
+
       // this.logger.debug("REFRESHH TOKEN", { refreshToken})
 
       // this.logger.debug('Refresh token attempt', { hasToken: !!refreshToken });
@@ -294,9 +296,9 @@ export class AuthController {
       res.cookie("accessToken", newAccessToken, {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        samesite: "Strict",
-        //samesite: "None",
-        //samesite: "None",
+        sameSite: "Strict",
+        //sameSite: "None",
+        //sameSite: "None",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
@@ -486,9 +488,9 @@ export class AuthController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        samesite: "Strict",
-        //samesite: "None",
-        //samesite: "None",
+        sameSite: "Strict",
+        //sameSite: "None",
+        //sameSite: "None",
         maxAge: 15 * 60 * 1000,
       });
 
@@ -501,9 +503,9 @@ export class AuthController {
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          samesite: "Strict",
-          //samesite: "None",
-          //samesite: "None",
+          sameSite: "Strict",
+          //sameSite: "None",
+          //sameSite: "None",
           maxAge: 30 * 24 * 60 * 60 * 1000,
         },
       );

@@ -70,7 +70,10 @@ class SpaceController {
     try {
       const {
         space_name,
-        space_description = "",
+        space_day,
+        space_time_start,
+        space_time_end,
+        space_yr_lvl,
         space_settings,
       } = req.body || {};
 
@@ -85,7 +88,13 @@ class SpaceController {
         ? JSON.stringify(space_settings)
         : JSON.stringify(defaultSettings);
 
-      console.log(space_name, space_description);
+      console.log(
+        space_name,
+        space_day,
+        space_time_start,
+        space_time_end,
+        space_yr_lvl,
+      );
 
       const account_id = res.locals.account_id || 1;
 
@@ -97,7 +106,10 @@ class SpaceController {
       const result = await this.space.createCourseSpace(
         account_id,
         space_name,
-        space_description,
+        space_day,
+        space_time_start,
+        space_time_end,
+        space_yr_lvl,
         settingsValue,
       );
 
@@ -206,41 +218,62 @@ class SpaceController {
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
-        return res.json({
+        return res.status(400).json({
           success: false,
           message: "Space UUID is required.",
         });
       }
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      let spaceData = null;
+      let isCourseSpace = false;
 
-      if (!space || !space.length) {
-        return res.json({
+      // 1️⃣ Check course space first
+      const courseSpace = await this.space.getByCourseSpaceUuid(space_uuid);
+
+      if (courseSpace && courseSpace.length > 0) {
+        spaceData = courseSpace[0];
+        isCourseSpace = true;
+      } else {
+        // 2️⃣ Check regular space
+        const space = await this.space.getBySpaceUuid(space_uuid);
+        if (space && space.length > 0) {
+          spaceData = space[0];
+        }
+      }
+
+      // 3️⃣ If not found in both
+      if (!spaceData) {
+        return res.status(404).json({
           success: false,
-          message: "Invalid space.",
+          message: "Invalid space UUID.",
         });
       }
 
-      if (account_id === space[0].created_by) {
+      // 4️⃣ Prevent joining own space
+      if (account_id === spaceData.created_by) {
         return res.json({
           success: false,
           message: "You cannot join your own space.",
         });
       }
 
-      await this.space.joinSpaceByLink(account_id, space[0].space_id);
+      // 5️⃣ Join request via link (creates pending invitation)
+      await this.space.joinSpaceByLink(account_id, spaceData.space_id);
 
+      // 6️⃣ Emit socket event if needed
       const io = getIO();
       if (io) {
-        io.emit("join_space_by_link");
+        io.emit("join_space_by_link", { space_id: spaceData.space_id });
       }
 
       return res.json({
         success: true,
-        message: "Request sent. Waiting for owner approval.",
+        message: isCourseSpace
+          ? "Join request sent for course space. Waiting for approval."
+          : "Join request sent. Waiting for owner approval.",
       });
     } catch (err) {
-      return res.json({
+      return res.status(500).json({
         success: false,
         message: err.message,
       });
@@ -258,17 +291,35 @@ class SpaceController {
         });
       }
 
-      // Get the space first
+      // Check if it's a course space first
+      const courseSpace = await this.space.getByCourseSpaceUuid(space_uuid);
+
+      console.log("COURSE", courseSpace);
+
+      if (courseSpace && courseSpace.length > 0) {
+        // It's a course space - get pending requests for course space
+        const results = await this.space.getPendingCourseLinkRequests(
+          courseSpace[0].space_id,
+        );
+
+        return res.json({
+          success: true,
+          message: "Successfully get all pending approvals for course space",
+          data: results,
+        });
+      }
+
+      // Get regular space
       const space = await this.space.getBySpaceUuid(space_uuid);
 
-      if (!space) {
+      if (!space || space.length === 0) {
         return res.status(404).json({
           success: false,
           message: "Invalid space.",
         });
       }
 
-      // Only fetch pending link_request invitations for this space
+      // Only fetch pending link_request invitations for this regular space
       const results = await this.space.getPendingLinkRequests(
         space[0].space_id,
       );
@@ -482,10 +533,15 @@ class SpaceController {
           message: "Space UUID and email are required.",
         });
       }
+      let space;
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      space = await this.space.getBySpaceUuid(space_uuid);
 
-      if (!space || !space.length) {
+      if (!space || space.length === 0) {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+      }
+
+      if (!space || space.length === 0) {
         return res.json({
           success: false,
           message: "Invalid space.",
@@ -509,13 +565,19 @@ class SpaceController {
         });
       }
 
-      await this.space.inviteUserByEmail(owner_id, space[0].space_id, email);
+      const response = await this.space.inviteUserByEmail(
+        owner_id,
+        space[0].space_id,
+        email,
+      );
 
-      // Emit WebSocket event for space invitation update
-      const io = getIO();
-      if (io) {
-        io.emit("space_invitation_updated");
+      if (response) {
+        const io = getIO();
+        if (io) {
+          io.emit("add-by-owner");
+        }
       }
+      // Emit WebSocket event for space invitation update
 
       return res.json({
         success: true,
@@ -642,16 +704,20 @@ class SpaceController {
       const result = await this.space.getAllCourseSpaces(account_id);
 
       const spaces = result.map((item) => ({
-        space_id: item.space_id,
-        space_uuid: item.space_uuid,
+        space_id: item.c_space_id,
+        space_uuid: item.c_space_uuid,
         space_link: `${
           process.env.NODE_ENV === "production"
             ? "https://immaculearnapi-template-production.up.railway.app"
             : "http://localhost:3000"
-        }/space/j?t=${item.space_uuid}`,
-        space_name: item.space_name,
-        space_description: item.description,
-        space_type: item.space_type,
+        }/space/j?t=${item.c_space_uuid}`,
+        space_name: item.c_space_name,
+        space_day: item.c_space_day,
+        space_time_start: item.c_space_time_start,
+        space_time_end: item.c_space_time_end,
+        space_yr_lvl: item.c_space_yr_lvl,
+        // space_description: item.description,
+        // space_type: item.space_type,
         creator: item.created_by,
         members: item.members.map((member) => ({
           ...member,

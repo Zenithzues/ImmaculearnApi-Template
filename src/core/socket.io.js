@@ -96,7 +96,14 @@ function emitOnlineUsersPerSpace(io) {
 
 
 
+let ioInstance = null;
+
+export function getIO() {
+  return ioInstance;
+}
+
 export default function initSocketIO(io) {
+  ioInstance = io;
   loadOnlineUsersFromFile();
 
   io.on('connection', (socket) => {

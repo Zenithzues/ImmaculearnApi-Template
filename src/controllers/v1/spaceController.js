@@ -6,6 +6,7 @@ import { Logger } from "../../utils/Logger.js";
 import maskEmail from "../../utils/maskEmail.js";
 import maskFullName from "../../utils/maskFullName.js";
 import User from "../../models/MySQL/UserModel.js";
+import { getIO } from "../../core/socket.io.js";
 
 class SpaceController {
   constructor() {
@@ -182,6 +183,11 @@ class SpaceController {
 
       await this.space.joinSpaceDirectly(account_id, space[0].space_id);
 
+      const io = getIO();
+      if (io) {
+        io.emit("accept_space_invitation");
+      }
+
       return res.json({
         success: true,
         message: "Successfully joined the space.",
@@ -223,6 +229,11 @@ class SpaceController {
       }
 
       await this.space.joinSpaceByLink(account_id, space[0].space_id);
+
+      const io = getIO();
+      if (io) {
+        io.emit("join_space_by_link");
+      }
 
       return res.json({
         success: true,
@@ -499,6 +510,12 @@ class SpaceController {
       }
 
       await this.space.inviteUserByEmail(owner_id, space[0].space_id, email);
+
+      // Emit WebSocket event for space invitation update
+      const io = getIO();
+      if (io) {
+        io.emit("space_invitation_updated");
+      }
 
       return res.json({
         success: true,

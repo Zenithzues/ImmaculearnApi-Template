@@ -5,107 +5,87 @@ class RegisteredEmail {
     this.db = connection;
   }
 
-  /**
-   * Check if email already exists
-   * @param {string} email
-   * @returns {boolean}
-   */
-  async isEmailRegistered(email) {
-    const sql =
-      'SELECT COUNT(*) AS count FROM registered_student_emails WHERE email = ?';
-
-    const [rows] = await this.db.execute(sql, [email]);
-    return rows[0].count > 0;
-  }
-
-  /**
-   * Register single email only
-   * @param {string} email
-   */
-  async registerEmail(email) {
-    const sql =
-      'INSERT INTO registered_student_emails (email) VALUES (?)';
-
-    await this.db.execute(sql, [email]);
-  }
-  
-
-  /**
-   * Register email safely (no duplicate crash)
-   * @param {string} email
-   */
+  /*
+  ========================================
+  REGISTER SINGLE EMAIL
+  ========================================
+  */
   async one_email(email) {
-    const exists = await this.isEmailRegistered(email);
+    const sql = `
+      INSERT INTO registered_student_emails (email)
+      VALUES (?)
+      ON DUPLICATE KEY UPDATE email = email
+    `;
 
-    if (exists) {
-      return {
-        inserted: false,
-        message: 'Email already registered',
-      };
-    }
-
-    await this.registerEmail(email);
+    const [result] = await this.db.execute(sql, [email]);
 
     return {
-      inserted: true,
+      inserted: result.affectedRows > 0,
       email,
+      message:
+        result.affectedRows > 0
+          ? "Email registered successfully"
+          : "Email already registered",
     };
   }
 
-  /**
-   * BULK register emails
-   * @param {string[]} emails
-   * @returns {{ inserted: number, skipped: number }}
-   */
+  /*
+  ========================================
+  BULK REGISTER (OPTIMIZED)
+  ========================================
+  */
   async bulkRegisterEmails(emails = []) {
     if (!emails.length) {
-      return { inserted: 0, skipped: 0 };
+      return { inserted: 0 };
     }
 
-    // Normalize & remove duplicates from CSV
     const uniqueEmails = [...new Set(
       emails.map(e => e.trim().toLowerCase())
     )];
 
-    const values = [];
-    let skipped = 0;
+    const values = uniqueEmails.map(email => [email]);
 
-    for (const email of uniqueEmails) {
-      const exists = await this.isEmailRegistered(email);
+    const sql = `
+      INSERT INTO registered_student_emails (email)
+      VALUES ?
+      ON DUPLICATE KEY UPDATE email = email
+    `;
 
-      if (!exists) {
-        values.push([email]);
-      } else {
-        skipped++;
-      }
-    }
-
-    if (values.length) {
-      const sql = `
-        INSERT INTO registered_student_emails (email)
-        VALUES ?
-      `;
-      await this.db.query(sql, [values]);
-    }
+    const [result] = await this.db.query(sql, [values]);
 
     return {
-      inserted: values.length,
-      skipped,
+      inserted: result.affectedRows,
     };
   }
 
-  async getAllRegisteredEmails() {
+  /*
+  ========================================
+  GET ALL REGISTERED STUDENTS (WITH JOIN)
+  ========================================
+  */
+  async getAllRegisteredStudents() {
   const sql = `
-    SELECT email
-    FROM registered_student_emails
+    SELECT 
+      s.student_id,
+      s.student_fn,
+      s.student_ln,
+      s.student_gender,
+      s.student_course,
+      s.student_yr_lvl,
+      r.email
+    FROM registered_student_emails r
+    LEFT JOIN accounts a 
+      ON r.email = a.email
+    LEFT JOIN students s
+      ON s.account_id = a.account_id
+    ORDER BY 
+      s.student_id IS NULL,   -- NULL (no match) will be last
+      s.student_id DESC
   `;
+
   const [rows] = await this.db.execute(sql);
-  return rows.map(row => row.email);
+  return rows;
 }
-
-
-
-  
 }
 
 export default RegisteredEmail;

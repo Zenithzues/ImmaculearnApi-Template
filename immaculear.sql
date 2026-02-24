@@ -247,6 +247,139 @@ LOCK TABLES `students` WRITE;
 /*!40000 ALTER TABLE `students` ENABLE KEYS */;
 UNLOCK TABLES;
 
+
+CREATE TABLE `tasks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(255) NOT NULL,
+  `description` TEXT NULL,
+  `type` ENUM('quiz','activity','project') NOT NULL DEFAULT 'activity',
+  `is_group_task` TINYINT(1) NOT NULL DEFAULT 0,
+  `start_date` DATETIME NULL,
+  `due_date` DATETIME NULL,
+  `total_score` DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+  `created_by` BIGINT UNSIGNED NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_groups`
+--
+
+CREATE TABLE `task_groups` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_id` BIGINT UNSIGNED NOT NULL,
+  `group_name` VARCHAR(100) NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`),
+  CONSTRAINT `task_groups_ibfk_1`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_group_members`
+--
+
+CREATE TABLE `task_group_members` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_group_id` BIGINT UNSIGNED NOT NULL,
+  `student_id` BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `task_group_id` (`task_group_id`),
+  CONSTRAINT `task_group_members_ibfk_1`
+    FOREIGN KEY (`task_group_id`) REFERENCES `task_groups` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_criteria`
+--
+
+CREATE TABLE `task_criteria` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_id` BIGINT UNSIGNED NOT NULL,
+  `criteria_name` VARCHAR(255) NOT NULL,
+  `description` TEXT NULL,
+  `max_score` DECIMAL(8,2) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`),
+  CONSTRAINT `task_criteria_ibfk_1`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_forms`
+--
+
+CREATE TABLE `task_forms` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_id` BIGINT UNSIGNED NOT NULL,
+  `question_text` TEXT NOT NULL,
+  `question_type` ENUM('multiple_choice','essay','file_upload') NOT NULL,
+  `points` DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`),
+  CONSTRAINT `task_forms_ibfk_1`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_form_options`
+--
+
+CREATE TABLE `task_form_options` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_form_id` BIGINT UNSIGNED NOT NULL,
+  `option_text` VARCHAR(255) NOT NULL,
+  `is_correct` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `task_form_id` (`task_form_id`),
+  CONSTRAINT `task_form_options_ibfk_1`
+    FOREIGN KEY (`task_form_id`) REFERENCES `task_forms` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_submissions`
+--
+
+CREATE TABLE `task_submissions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_id` BIGINT UNSIGNED NOT NULL,
+  `student_id` BIGINT UNSIGNED NULL,
+  `task_group_id` BIGINT UNSIGNED NULL,
+  `submitted_at` DATETIME NULL,
+  `score` DECIMAL(8,2) NULL,
+  `feedback` TEXT NULL,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`),
+  KEY `task_group_id` (`task_group_id`),
+  CONSTRAINT `task_submissions_ibfk_1`
+    FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`)
+    ON DELETE CASCADE,
+  CONSTRAINT `task_submissions_ibfk_2`
+    FOREIGN KEY (`task_group_id`) REFERENCES `task_groups` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 --
 -- Table structure for table `tokens`
 --

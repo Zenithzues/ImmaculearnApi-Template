@@ -169,7 +169,7 @@ class RegisterProfEmailController {
 
   async getAllEmailsAction(req, res) {
     try {
-      const emails = await this.model.getAllRegisteredEmails(); 
+      const emails = await this.model.getAllRegisteredProfessors(); 
       return res.json({ emails });
     } catch (err) {
       return res.status(500).json({

@@ -98,6 +98,7 @@ spaceRouter.patch(
 );
 // spaceRouter.get('/:space_id', space.get_space_by_id.bind(space));
 
+spaceRouter.delete("/:space_uuid/leave", space.leave_space.bind(space));
 spaceRouter.delete("/:space_uuid", space.delete_space.bind(space));
 
 /**

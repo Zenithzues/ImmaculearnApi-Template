@@ -988,6 +988,34 @@ class SpaceController {
       });
     }
   }
+
+  async leave_space(req, res) {
+    try {
+      const account_id = res.locals.account_id || 12;
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User." });
+      const space_uuid = req.params.space_uuid || "";
+      if (!space_uuid)
+        return res.status(404).json({
+          success: false,
+          message: "Invalid Request, Space UUID required.",
+        });
+
+      await this.space.leaveSpaceByUserId(account_id, space_uuid);
+
+      res.json({
+        success: true,
+        message: `Leaved Space Successfully.`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
 }
 
 export default SpaceController;

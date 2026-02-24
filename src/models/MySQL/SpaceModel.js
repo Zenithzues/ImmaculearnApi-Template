@@ -1268,6 +1268,54 @@ class Space {
       conn.release();
     }
   }
+
+  async leaveSpaceByUserId(account_id, space_uuid) {
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // First determine if it's a regular or course space
+      const regularSpace = await connection.execute(
+        "SELECT space_id FROM spaces WHERE space_uuid = ?",
+        [space_uuid],
+      );
+
+      const courseSpace = await connection.execute(
+        "SELECT c_space_id FROM course_spaces WHERE c_space_uuid = ?",
+        [space_uuid],
+      );
+
+      if (regularSpace && regularSpace[0].length) {
+        const space_id = regularSpace[0][0].space_id;
+
+        // Delete space members
+        await connection.execute(
+          "DELETE FROM space_members WHERE account_id = ? AND space_id = ?",
+          [account_id, space_id],
+        );
+      } else if (courseSpace && courseSpace[0].length) {
+        const c_space_id = courseSpace[0][0].c_space_id;
+
+        // Delete space members
+        await connection.execute(
+          "DELETE FROM space_members WHERE account_id = ? AND c_space_id = ?",
+          [account_id, c_space_id],
+        );
+      } else {
+        throw new Error("Space not found");
+      }
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error deleting space:", err);
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 export default Space;

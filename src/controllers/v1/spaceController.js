@@ -7,9 +7,11 @@ import maskEmail from "../../utils/maskEmail.js";
 import maskFullName from "../../utils/maskFullName.js";
 import User from "../../models/MySQL/UserModel.js";
 import { getIO } from "../../core/socket.io.js";
+import AdminModel from "../../models/MySQL/AdminModel.js";
 
 class SpaceController {
   constructor() {
+    this.acadTerm = new AdminModel();
     this.space = new Space();
     this.user = new User();
     this.logger = new Logger("SpaceController");
@@ -68,6 +70,12 @@ class SpaceController {
 
   async create_course_space(req, res) {
     try {
+      const account_id = res.locals.account_id || 1;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
       const {
         space_name,
         space_day,
@@ -96,15 +104,18 @@ class SpaceController {
         space_yr_lvl,
       );
 
-      const account_id = res.locals.account_id || 1;
+      const academic = await this.acadTerm.getLatestAcademicTerm();
 
-      if (!account_id)
-        return res
-          .status(401)
-          .json({ success: false, message: "UnAuthenticated User!" });
+      if (!academic)
+        return res.status(404).json({
+          success: false,
+          message:
+            "the Academic Period Not Started Yet. Contact the Administrator.",
+        });
 
       const result = await this.space.createCourseSpace(
         account_id,
+        academic.acad_term_id,
         space_name,
         space_day,
         space_time_start,
@@ -749,6 +760,8 @@ class SpaceController {
         space_time_start: item.c_space_time_start,
         space_time_end: item.c_space_time_end,
         space_yr_lvl: item.c_space_yr_lvl,
+        academic_term: item.acad_term_name,
+        academic_semester: item.semester,
         // space_description: item.description,
         // space_type: item.space_type,
         creator: item.created_by,
@@ -1008,6 +1021,58 @@ class SpaceController {
       res.json({
         success: true,
         message: `Leaved Space Successfully.`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+
+  /****
+   * THIS IS FOR GRADING OF THE PROFESSOR TO ITS STUDENTS
+   */
+
+  async add_remarks(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User." });
+
+      const { student_id, space_uuid, prelim, midterm, prefinals, finals } =
+        req.body || {};
+
+      // const space_uuid = req.params.space_uuid || "";
+      // const {}
+      if (!space_uuid || !student_id)
+        return res.status(404).json({
+          success: false,
+          message: "Invalid Request, Space UUID and Student ID required.",
+        });
+
+      if (!prelim && !midterm && !prefinals && !finals)
+        return res.status(404).json({
+          success: false,
+          message:
+            "Invalid Request, Must be one of the Grading Period is not Null",
+        });
+
+      await this.space.addRemarksToStudentById(
+        student_id,
+        account_id,
+        space_uuid,
+        prelim,
+        midterm,
+        prefinals,
+        finals,
+      );
+
+      res.json({
+        success: true,
+        message: `Added Remarks Successfully.`,
       });
     } catch (err) {
       res.status(500).json({

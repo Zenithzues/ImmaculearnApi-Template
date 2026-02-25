@@ -172,14 +172,14 @@ export class AuthController {
       }
 
       // 8. Set cookies
-      res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        //sameSite: "None",
-        //sameSite: "None",
-        maxAge: 15 * 60 * 1000, // 15 minutes
-      });
+      // res.cookie("accessToken", accessToken, {
+      //   httpOnly: true,
+      //   secure: process.env.NODE_ENV === "production",
+      //   sameSite: "Strict",
+      //   //sameSite: "None",
+      //   //sameSite: "None",
+      //   maxAge: 15 * 60 * 1000, // 15 minutes
+      // });
 
       res.cookie(
         "refreshToken",
@@ -207,11 +207,12 @@ export class AuthController {
       res.json({
         success: true,
         message: "Login successful",
-        data: {
-          account_id: user.account_id,
-          email: user.email,
-          role: emailCheck.role,
-        },
+        accessToken,
+        // data: {
+        //   account_id: user.account_id,
+        //   email: user.email,
+        //   role: emailCheck.role,
+        // },
       });
     } catch (err) {
       this.logger.logError(err, {
@@ -313,6 +314,7 @@ export class AuthController {
       res.json({
         success: true,
         message: "Token refreshed successfully",
+        accessToken: newAccessToken,
       });
     } catch (err) {
       this.logger.error("Refresh error", { error: err.message });

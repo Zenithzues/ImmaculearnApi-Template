@@ -109,4 +109,6 @@ spaceRouter.delete(
   space.remove_user_from_space.bind(space),
 );
 
+spaceRouter.post("/remarks", space.add_remarks.bind(space));
+
 export default spaceRouter;

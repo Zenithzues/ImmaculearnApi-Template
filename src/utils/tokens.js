@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import { JWT_SECRET, ACCESS_TOKEN_EXPIRES } from '../config.js';
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { JWT_SECRET, ACCESS_TOKEN_EXPIRES } from "../config.js";
 
 /**
  * Generate a JWT access token
@@ -8,7 +8,15 @@ import { JWT_SECRET, ACCESS_TOKEN_EXPIRES } from '../config.js';
  * @returns {string} JWT token
  */
 export function generateAccessToken(userId, role) {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
+  return jwt.sign({ userId, role }, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+  });
+}
+
+export function generateAdminAccessToken(adminId) {
+  return jwt.sign({ adminId }, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+  });
 }
 
 /**
@@ -16,5 +24,5 @@ export function generateAccessToken(userId, role) {
  * @returns {string} random token (~43 chars)
  */
 export function generateRefreshToken() {
-  return crypto.randomBytes(32).toString('base64url');
+  return crypto.randomBytes(32).toString("base64url");
 }

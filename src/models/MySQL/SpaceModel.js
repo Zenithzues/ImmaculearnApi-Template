@@ -142,6 +142,7 @@ class Space {
 
   async createCourseSpace(
     account_id,
+    acad_term_id,
     space_name,
     space_day,
     space_time_start,
@@ -150,8 +151,12 @@ class Space {
     space_settings,
   ) {
     try {
-      const query = `INSERT INTO course_spaces (c_space_uuid, c_space_name, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, NOW())`;
+      const query = `
+      INSERT INTO course_spaces (acad_term_id, c_space_uuid, c_space_name, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) 
+      VALUES (?, UUID(), ?, ?, ?, ?, ?, ?, ?, NOW())
+      `;
       const result = await this.db.execute(query, [
+        acad_term_id,
         space_name,
         space_day,
         space_time_start,
@@ -955,7 +960,10 @@ class Space {
                     )
                     SEPARATOR ','
                 ), 
-            ']') AS members
+            ']') AS members,
+            at.acad_term_name,
+            at.semester
+
         FROM course_spaces csp
         LEFT JOIN space_members spm
             ON csp.c_space_id = spm.c_space_id 
@@ -967,6 +975,8 @@ class Space {
             ON acc.account_id = st.account_id
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
+        LEFT JOIN academic_term at
+            ON csp.acad_term_id = at.acad_term_id
         WHERE EXISTS (
               SELECT 1 
               FROM professors p 
@@ -1311,6 +1321,94 @@ class Space {
     } catch (err) {
       await connection.rollback();
       this.logger.error("Error deleting space:", err);
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /****
+   * THIS IS FOR PROFESSOR ADDING GRADE
+   */
+  async addRemarksToStudentById(
+    student_id,
+    prof_id,
+    space_uuid,
+    prelim = null,
+    midterm = null,
+    prefinals = null,
+  ) {
+    // Build update data dynamically
+    const updateData = {};
+    if (prelim != null) updateData.prelim = prelim;
+    if (midterm != null) updateData.midterm = midterm;
+    if (prefinals != null) updateData.prefinals = prefinals;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new Error("No grading periods provided to update.");
+    }
+
+    const connection = await this.db.getConnection();
+
+    console.log(updateData);
+
+    try {
+      await connection.beginTransaction();
+
+      // Get the course space ID
+      const courseSpaceRows = await connection.execute(
+        "SELECT c_space_id FROM course_spaces WHERE c_space_uuid = ? AND created_by = ?",
+        [space_uuid, prof_id],
+      );
+
+      if (courseSpaceRows[0].length === 0) {
+        throw new Error("Course space not found.");
+      }
+
+      const c_space_id = courseSpaceRows[0][0].c_space_id;
+
+      // Check if remark already exists
+      const existingRemark = await connection.execute(
+        "SELECT * FROM remarks WHERE c_space_id = ? AND account_id = ?",
+        [c_space_id, student_id],
+      );
+
+      if (existingRemark[0].length > 0) {
+        // Update existing remark
+        const fields = [];
+        const values = [];
+
+        for (const key in updateData) {
+          fields.push(`${key} = ?`);
+          values.push(updateData[key]);
+        }
+
+        values.push(c_space_id, student_id);
+
+        await connection.execute(
+          `UPDATE remarks SET ${fields.join(", ")} WHERE c_space_id = ? AND account_id = ?`,
+          values,
+        );
+      } else {
+        // Insert new remark
+        await connection.execute(
+          `INSERT INTO remarks (c_space_id, prof_id, account_id, prelim, midterm, prefinals, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            c_space_id,
+            prof_id,
+            student_id,
+            updateData.prelim ?? null,
+            updateData.midterm ?? null,
+            updateData.prefinals ?? null,
+          ],
+        );
+      }
+
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error in remarksAddByStudentId:", err);
       throw err;
     } finally {
       connection.release();

@@ -67,6 +67,35 @@ class FileModelSupabase {
     });
   }
 
+  async listFilesBySpaceUUID(account_id, space_uuid) {
+    if (!space_uuid) {
+      throw new Error("space_uuid is required");
+    }
+
+    const prefix = `SPACES/${space_uuid}/RESOURCES`;
+
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .list(prefix);
+
+    if (error) throw error;
+    if (!data) return [];
+
+    // ✅ Filter by account_id prefix
+    const files = data.filter((file) => file.name.startsWith(`${account_id}-`));
+
+    return files.map((file) => {
+      const { data: urlData } = this.supabase.storage
+        .from(this.bucket)
+        .getPublicUrl(`${prefix}/${file.name}`);
+
+      return {
+        ...file,
+        url: urlData.publicUrl,
+      };
+    });
+  }
+
   async deleteFileByName(fileName, folder = "RESOURCES") {
     const filePath = `${folder}/${fileName}`;
 

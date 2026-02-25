@@ -7,9 +7,11 @@ import {
 } from "../../services/fileService.js";
 
 import FileModelSupabase from "../../models/Supabase/fileModel.js";
+import AdminModel from "../../models/MySQL/AdminModel.js";
 
 class FileController {
   constructor() {
+    this.acadTerm = new AdminModel();
     this.fileModel = new FileModel();
     this.supabaseModel = new FileModelSupabase("IMMACULEARN");
   }
@@ -155,6 +157,24 @@ class FileController {
   async upload_resources(req, res) {
     try {
       const account_id = res.locals.account_id || 1;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User." });
+      // const academic = await this.acadTerm.getLatestAcademicTerm();
+      const academic = await this.acadTerm.getLatestAcademicTerm();
+
+      if (!academic)
+        return res.status(404).json({
+          success: false,
+          message:
+            "the Academic Period Not Started Yet. Contact the Administrator.",
+        });
+
+      const space_uuid = req.body.space_uuid; // 👈 get space_uuid
+      console.log("BODY:", req.body);
+      console.log(space_uuid);
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -162,12 +182,19 @@ class FileController {
         });
       }
 
+      if (!space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "space_uuid is required",
+        });
+      }
+
       const file = req.file;
 
-      const uniqueName = `${account_id}-${file.originalname}`;
+      const uniqueName = `${account_id}-${academic.acad_term_id}-${Date.now()}-${file.originalname}`;
 
-      // 👇 THIS is your "folder"
-      const destinationPath = `RESOURCES/${uniqueName}`;
+      // 👇 Now file is inside space folder
+      const destinationPath = `SPACES/${space_uuid}/RESOURCES/${uniqueName}`;
 
       const uploadedPath = await this.supabaseModel.uploadFile(
         file.buffer,
@@ -181,6 +208,7 @@ class FileController {
         success: true,
         path: uploadedPath,
         url: publicUrl,
+        space_uuid,
       });
     } catch (error) {
       console.error(error);
@@ -191,10 +219,21 @@ class FileController {
     }
   }
 
-  async list_resources(req, res) {
+  async list_resources_by_space_uuid(req, res) {
     console.log("LIST RESOURCES");
     try {
-      const files = await this.supabaseModel.listFiles();
+      const account_id = res.locals.account_id || 1;
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User." });
+      // const account_
+
+      const space_uuid = req.params.space_uuid || "";
+      const files = await this.supabaseModel.listFilesBySpaceUUID(
+        account_id,
+        space_uuid,
+      );
       return res.json({ success: true, data: files });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });

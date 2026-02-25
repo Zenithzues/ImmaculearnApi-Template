@@ -31,12 +31,12 @@ const allowed = [
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (!allowed.includes(file.mimetype)) {
-      return cb(new Error("Invalid file type"));
-    }
-    cb(null, true);
-  },
+  // fileFilter: (req, file, cb) => {
+  //   if (!allowed.includes(file.mimetype)) {
+  //     return cb(new Error("Invalid file type"));
+  //   }
+  //   cb(null, true);
+  // },
 });
 
 fileRouter.use(authorization);
@@ -45,8 +45,8 @@ fileRouter.use(authorization);
 const fileController = new FileController();
 
 fileRouter.get(
-  "/resources/list",
-  fileController.list_resources.bind(fileController),
+  "/resources/:space_uuid",
+  fileController.list_resources_by_space_uuid.bind(fileController),
 );
 
 fileRouter.post(

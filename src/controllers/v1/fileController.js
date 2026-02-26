@@ -191,6 +191,9 @@ class FileController {
 
       const file = req.file;
 
+      /**
+       * NAMING FOR SPECIFIC FILES (ACCOUNT ID, ACADEMIC TERM ID, DATE SUBMITTED, ORIGINAL NAME)
+       */
       const uniqueName = `${account_id}-${academic.acad_term_id}-${Date.now()}-${file.originalname}`;
 
       // 👇 Now file is inside space folder

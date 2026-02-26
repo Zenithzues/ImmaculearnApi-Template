@@ -35,4 +35,10 @@ regemailRouter.get(
   regemail.getAllEmailsAction.bind(regemail)
 );
 
+// Delete email and all associated records
+regemailRouter.delete(
+  '/delete/:email',
+  regemail.deleteEmailAction.bind(regemail)
+);
+ 
 export default regemailRouter;

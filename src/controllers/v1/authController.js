@@ -342,7 +342,7 @@ export class AuthController {
         //   success: false,
         //   message: 'Invalid or expired token'
         // });
-      }
+      }s
 
       const account_id = payload.userId;
 

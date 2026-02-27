@@ -4,7 +4,7 @@ import { generateAccessToken } from "../../utils/tokens.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 // import User from '../../models/MySQL/UserModel.js';
 import { Logger } from "../../utils/Logger.js";
-import { hybridDatabase } from "../../core/HybridDatabase.js";
+// import { hybridDatabase } from "../../core/HybridDatabase.js";
 import { Validator } from "../../utils/Validator.js";
 import User from "../../models/MySQL/UserModel.js";
 
@@ -63,10 +63,10 @@ export class AuthController {
       const result = await this.user.getUserStatus(payload.userId);
 
       // Sync user to Supabase for collaboration features
-      await hybridDatabase.syncUserToSupabase(
-        payload.userId.toString(),
-        payload.role,
-      );
+      // await hybridDatabase.syncUserToSupabase(
+      //   payload.userId.toString(),
+      //   payload.role,
+      // );
 
       const profileData = {
         id: user[0].account_id,
@@ -153,7 +153,7 @@ export class AuthController {
       await this.user.updateUserStatus(user.account_id, "online");
 
       // 5. Sync user to Supabase
-      await hybridDatabase.syncUserToSupabase(user.account_id.toString());
+      // await hybridDatabase.syncUserToSupabase(user.account_id.toString());
 
       // 6. Generate tokens
       const accessToken = generateAccessToken(user.account_id, emailCheck.role);
@@ -479,7 +479,7 @@ export class AuthController {
       const accountId = result.insertId;
 
       // 5. Sync user to Supabase
-      await hybridDatabase.syncUserToSupabase(accountId.toString());
+      // await hybridDatabase.syncUserToSupabase(accountId.toString());
 
       // 6. Generate tokens
       const accessToken = generateAccessToken(accountId, emailCheck.role);

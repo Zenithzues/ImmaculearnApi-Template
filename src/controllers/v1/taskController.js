@@ -4,7 +4,7 @@ import { generateAccessToken } from "../../utils/tokens.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 // import User from '../../models/MySQL/UserModel.js';
 import { Logger } from "../../utils/Logger.js";
-import { hybridDatabase } from "../../core/HybridDatabase.js";
+// import { hybridDatabase } from "../../core/HybridDatabase.js";
 import { Validator } from "../../utils/Validator.js";
 import User from "../../models/MySQL/UserModel.js";
 import Task from "../../models/MySQL/TaskModel.js";
@@ -245,7 +245,7 @@ export class TaskController {
       const accountId = result.insertId;
 
       // 5. Sync user to Supabase
-      await hybridDatabase.syncUserToSupabase(accountId.toString());
+      // await hybridDatabase.syncUserToSupabase(accountId.toString());
 
       // 6. Generate tokens
       const accessToken = generateAccessToken(accountId, emailCheck.role);

@@ -224,7 +224,10 @@ class SpaceController {
         try {
           const io = getIO();
           if (io && typeof io.emit === "function") {
-            io.emit("accept_space_invitation");
+            io.emit("accept_space_invitation", {
+              space_id,
+              owner_id: space[0].created_by,
+            });
           }
         } catch (socketErr) {
           // Log socket error but don't fail the request
@@ -424,6 +427,8 @@ class SpaceController {
       const owner_id = res.locals.account_id || 1;
       const { space_uuid, invited_account_id } = req.body || {};
 
+      console.log(space_uuid);
+
       if (!space_uuid || !invited_account_id) {
         return res.json({
           success: false,
@@ -618,7 +623,10 @@ class SpaceController {
       if (response) {
         const io = getIO();
         if (io) {
-          io.emit("add-by-owner");
+          io.emit("add-by-owner", {
+            space_id: space[0].space_id,
+            email: isVerified?.email,
+          });
         }
       }
       // Emit WebSocket event for space invitation update
@@ -989,6 +997,13 @@ class SpaceController {
 
       if (!result || result[0].affectedRows === 0)
         return res.json({ success: true, message: "User not Found in Space!" });
+
+      // if (response) {
+      const io = getIO();
+      if (io) {
+        io.emit("remove_user_from_space", { spaceId: space_id, user_id });
+      }
+      // }
 
       res.json({
         success: true,

@@ -75,13 +75,77 @@ class AdminModel {
       `
         SELECT *
         FROM academic_term
-        WHERE end IS NULL
-        ORDER BY start DESC
+        WHERE academic_status = "active"
+        ORDER BY created_at DESC
         LIMIT 1;
       `,
     );
 
     return result[0];
+  }
+
+  async getAllAcademic() {
+    const result = await this.db.execute(
+      `
+        SELECT *
+        FROM academic_term
+      `,
+    );
+
+    return result;
+  }
+
+  async createAcademic(admin_id, period, semester, year) {
+    const conn = await this.db.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      await this.db.execute(
+        `
+        INSERT INTO academic_term(acad_term_name, semester, academic_year, academic_status, created_by, created_at)
+        VALUES (?, ?, ?, "active", ?, NOW())
+        `,
+        [period, semester, year, admin_id],
+      );
+
+      await conn.commit();
+
+      return true;
+    } catch (err) {
+      await conn.rollback();
+      this.logger.error("Creating Academic failed", { admin_id, error: err });
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async closeAcademic(admin_id, acad_term_id) {
+    const conn = await this.db.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      await this.db.execute(
+        `
+        UPDATE academic_term
+        SET academic_status = "completed", updated_at = NOW();
+        WHERE acad_term_id = ? AND created_by = ?
+        `,
+        [acad_term_id, admin_id],
+      );
+
+      await conn.commit();
+
+      return true;
+    } catch (err) {
+      await conn.rollback();
+      this.logger.error("Creating Academic failed", { admin_id, error: err });
+      throw err;
+    } finally {
+      conn.release();
+    }
   }
 }
 

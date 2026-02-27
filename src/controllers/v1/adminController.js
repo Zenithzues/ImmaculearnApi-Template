@@ -261,20 +261,140 @@ class AdminController {
     }
   }
 
-  async start_academic_term(req, res) {
+  async get_all_academic(req, res) {
     try {
-      const userInfo = await this.admin.get(res.locals.account_id);
+      const admin_id = res.locals.admin_id || 1;
+
+      if (!admin_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated Admin." });
+
+      const userInfo = await this.admin.findByAdminId(admin_id);
+
+      if (!userInfo)
+        return res
+          .status(404)
+          .json({ success: false, message: "Admin not found." });
+
+      const result = await this.admin.getAllAcademic();
 
       res.json({
         success: true,
-        data: {
-          account_id: userInfo?.account_id,
-          userEmail: userInfo?.email,
-        },
+        data: result,
       });
       res.end();
     } catch (err) {
       a;
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+  async create_academic(req, res) {
+    try {
+      const admin_id = res.locals.admin_id || 1;
+
+      if (!admin_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated Admin." });
+
+      const { academic_period, academic_semester, academic_year } =
+        req.body || {};
+
+      if (!academic_period || !academic_semester || !academic_year)
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Request." });
+
+      const userInfo = await this.admin.findByAdminId(admin_id);
+
+      if (!userInfo)
+        return res
+          .status(404)
+          .json({ success: false, message: "Admin not found." });
+
+      const academic = await this.admin.getLatestAcademicTerm();
+
+      if (academic && academic?.academic_status === "active")
+        return res.status(400).json({
+          success: false,
+          message:
+            "Academic Period is On-going, Close the Existing Period first.",
+        });
+
+      const result = await this.admin.createAcademic(
+        admin_id,
+        academic_period,
+        academic_semester,
+        academic_year,
+      );
+
+      if (!result)
+        return res
+          .status(400)
+          .json({ success: false, messgae: "Invalid Request" });
+
+      res.json({
+        success: true,
+        message: "Successfully Creating Academic",
+      });
+      res.end();
+    } catch (err) {
+      if (err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          message: "Academic already exists",
+          field: "acad_term_name, semester, academic_year",
+        });
+      }
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+
+  async close_academic(req, res) {
+    try {
+      const admin_id = res.locals.admin_id || 1;
+
+      if (!admin_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated Admin." });
+
+      const { acad_term_id } = req.body || {};
+      const userInfo = await this.admin.findByAdminId(admin_id);
+
+      if (!userInfo)
+        return res
+          .status(404)
+          .json({ success: false, message: "Admin not found." });
+
+      const academic = await this.admin.getLatestAcademicTerm();
+
+      if (academic && academic?.academic_status === "active")
+        return res.status(400).json({
+          success: false,
+          message:
+            "Academic Period is On-going, Close the Existing Period first.",
+        });
+
+      const result = await this.admin.closeAcademic(admin_id, acad_term_id);
+
+      if (!result)
+        return res
+          .status(400)
+          .json({ success: false, messgae: "Invalid Request" });
+
+      res.json({
+        success: true,
+        message: "Successfully Creating Academic",
+      });
+      res.end();
+    } catch (err) {
       res.json({
         success: false,
         message: err.toString(),

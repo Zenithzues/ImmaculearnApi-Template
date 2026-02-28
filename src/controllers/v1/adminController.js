@@ -281,6 +281,7 @@ class AdminController {
 
       res.json({
         success: true,
+        message: "Successfully get all academic",
         data: result,
       });
       res.end();
@@ -352,6 +353,115 @@ class AdminController {
       res.json({
         success: false,
         message: err.toString(),
+      });
+    }
+  }
+
+  async update_academic(req, res) {
+    try {
+      const admin_id = res.locals.admin_id || 1;
+
+      if (!admin_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated Admin.",
+        });
+      }
+
+      const {
+        academic_id,
+        academic_status = null,
+        academic_period = null,
+        academic_semester = null,
+        academic_year = null,
+      } = req.body || {};
+
+      console.log(req.body);
+
+      // acad_term_id MUST be provided
+      if (!academic_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Academic ID is required.",
+        });
+      }
+
+      // At least one field to update must be provided
+      if (
+        academic_status === null &&
+        academic_period === null &&
+        academic_semester === null &&
+        academic_year === null
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "No fields provided to update.",
+        });
+      }
+
+      const userInfo = await this.admin.findByAdminId(admin_id);
+
+      if (!userInfo) {
+        return res.status(404).json({
+          success: false,
+          message: "Admin not found.",
+        });
+      }
+
+      /**
+       * Business rule:
+       * Only block updates when trying to CREATE / ACTIVATE
+       * a new academic period while one is active
+       */
+      const academic = await this.admin.getLatestAcademicTerm();
+
+      console.log(academic);
+
+      if (
+        academic &&
+        academic.academic_status === "active" &&
+        academic_status === "active"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "An academic period is currently active. Close it before activating another.",
+        });
+      }
+
+      const result = await this.admin.updateAcademic(
+        admin_id,
+        academic_id,
+        academic_period,
+        academic_semester,
+        academic_year,
+        academic_status,
+      );
+
+      if (!result) {
+        return res.status(400).json({
+          success: false,
+          message: "Failed to update academic term.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Academic term updated successfully.",
+      });
+    } catch (err) {
+      this.logger?.error("Update academic error", err);
+
+      if (err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Invalid Request, Check for duplicate Academic Period, Academic Semester, and Academic Year.",
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error.",
       });
     }
   }

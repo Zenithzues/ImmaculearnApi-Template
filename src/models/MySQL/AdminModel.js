@@ -87,7 +87,14 @@ class AdminModel {
   async getAllAcademic() {
     const result = await this.db.execute(
       `
-        SELECT *
+        SELECT 
+        acad_term_id AS academic_id,
+        acad_term_name AS academic_period, 
+        semester AS academic_semester, 
+        academic_year, academic_status, 
+        created_by, 
+        updated_at, 
+        created_at
         FROM academic_term
       `,
     );
@@ -115,6 +122,75 @@ class AdminModel {
     } catch (err) {
       await conn.rollback();
       this.logger.error("Creating Academic failed", { admin_id, error: err });
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async updateAcademic(
+    admin_id,
+    acad_term_id,
+    academic_period = null,
+    academic_semester = null,
+    academic_year = null,
+    academic_status = null,
+  ) {
+    const conn = await this.db.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      const fields = [];
+      const values = [];
+
+      if (academic_period !== null) {
+        fields.push("acad_term_name = ?");
+        values.push(academic_period);
+      }
+
+      if (academic_semester !== null) {
+        fields.push("semester = ?");
+        values.push(academic_semester);
+      }
+
+      if (academic_year !== null) {
+        fields.push("academic_year = ?");
+        values.push(academic_year);
+      }
+
+      if (academic_status !== null) {
+        fields.push("academic_status = ?");
+        values.push(academic_status);
+      }
+
+      // Always update timestamp
+      fields.push("updated_at = NOW()");
+
+      // 🚨 Nothing to update
+      if (fields.length === 1) {
+        throw new Error("No fields provided to update");
+      }
+
+      const sql = `
+      UPDATE academic_term
+      SET ${fields.join(", ")}
+      WHERE acad_term_id = ? AND created_by = ?
+    `;
+
+      values.push(acad_term_id, admin_id);
+
+      const [result] = await conn.execute(sql, values);
+
+      if (result.affectedRows === 0) {
+        throw new Error("Academic term not found or unauthorized");
+      }
+
+      await conn.commit();
+      return true;
+    } catch (err) {
+      await conn.rollback();
+      this.logger.error("Updating Academic failed", { admin_id, error: err });
       throw err;
     } finally {
       conn.release();

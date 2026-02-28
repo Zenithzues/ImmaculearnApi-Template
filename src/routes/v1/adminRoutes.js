@@ -21,8 +21,8 @@ adminRouter.get("/refresh", admin.refresh.bind(admin));
 
 // adminRouter.use(adminAuth);
 adminRouter.get("/academic/all", admin.get_all_academic.bind(admin));
-adminRouter.post("/academic/start", admin.create_academic.bind(admin));
-adminRouter.patch("/academic/edit", admin.create_academic.bind(admin));
+adminRouter.post("/academic", admin.create_academic.bind(admin));
+adminRouter.patch("/academic/update", admin.update_academic.bind(admin));
 adminRouter.get("/profile", admin.profile.bind(admin));
 
 export default adminRouter;

@@ -8,11 +8,13 @@ import {
 import MysqlFileModel from "../../models/MySQL/FileModel.js";
 import FileModelSupabase from "../../models/Supabase/FileModel.js";
 import AdminModel from "../../models/MySQL/AdminModel.js";
+import Space from "../../models/MySQL/SpaceModel.js";
 
 class FileController {
   constructor() {
+    this.space = new Space();
     this.acadTerm = new AdminModel();
-    this.MysqlFileModel = new MysqlFileModel();
+    this.mysqlFileModel = new MysqlFileModel();
     this.supabaseModel = new FileModelSupabase("IMMACULEARN");
   }
 
@@ -52,7 +54,7 @@ class FileController {
           .status(400)
           .json({ success: false, message: "file_id required" });
 
-      // const draft = await this.MysqlFileModel.saveDraft( file_id, content );
+      // const draft = await this.mysqlFileModel.saveDraft( file_id, content );
 
       const draft = await updateDraft({ file_id, content });
 
@@ -89,7 +91,7 @@ class FileController {
       }
 
       // 1️⃣ Get file info from DB
-      const file = await this.MysqlFileModel.findById(file_id);
+      const file = await this.mysqlFileModel.findById(file_id);
       if (!file)
         return res
           .status(404)
@@ -121,7 +123,7 @@ class FileController {
   async list(req, res) {
     try {
       const { space_id } = req.params || {};
-      const files = await this.MysqlFileModel.findAllBySpaceId(space_id);
+      const files = await this.mysqlFileModel.findAllBySpaceId(space_id);
 
       console.log(files);
       return res.json({ success: true, data: files });
@@ -135,7 +137,7 @@ class FileController {
   async delete(req, res) {
     try {
       const { id } = req.params;
-      const deleted = await this.MysqlFileModel.delete(id);
+      const deleted = await this.mysqlFileModel.delete(id);
 
       if (!deleted) {
         return res
@@ -171,53 +173,84 @@ class FileController {
             "The Academic Period Not Started Yet. Contact the Administrator.",
         });
 
-      const space_uuid = req.body.space_uuid;
-      if (!req.file)
+      const { space_uuid, lesson_name } = req.body || {};
+
+      console.log(req.body);
+
+      if (!lesson_name)
         return res
           .status(400)
-          .json({ success: false, message: "No file uploaded" });
+          .json({ success: false, message: "Must have Lesson Name" });
+
       if (!space_uuid)
         return res
           .status(400)
           .json({ success: false, message: "space_uuid is required" });
 
+      if (!req.file)
+        return res
+          .status(400)
+          .json({ success: false, message: "No file uploaded" });
+
+      // --- Determine space type ---
+      let space = await this.space.getBySpaceUuid(space_uuid);
+      let c_space_id = null;
+      let space_id = null;
+
+      if (space) {
+        space_id = space[0].space_id; // normal space
+      } else {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+        if (!space)
+          return res
+            .status(404)
+            .json({ success: false, message: "Space not found" });
+
+        c_space_id = space[0].space_id; // course space
+      }
+
+      // --- Create lesson ---
+      const lesson_id = await this.mysqlFileModel.createLesson(
+        academic.acad_term_id,
+        c_space_id,
+        space_id,
+        lesson_name,
+      );
+
       const file = req.file;
 
-      // Generate unique filename
+      // --- Generate unique filename ---
       const uniqueName = `${account_id}-${academic.acad_term_id}-${Date.now()}-${file.originalname}`;
-      const destinationPath = `SPACES/${space_uuid}/RESOURCES/${uniqueName}`;
+      const storage_path = `SPACES/${space_uuid}/RESOURCES/${uniqueName}`;
 
-      // Upload to Supabase
+      // --- Upload to Supabase ---
       const uploadedPath = await this.supabaseModel.uploadFile(
         file.buffer,
-        destinationPath,
+        storage_path,
         file.mimetype,
       );
       const publicUrl = this.supabaseModel.getPublicUrl(uploadedPath);
 
-      // --- INSERT into MySQL ---
-      const sql = `
-      INSERT INTO files 
-        (acad_term_id, c_space_id, owner_id, orig_file_name, file_path, file_size, file_mimetype)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-      const params = [
-        academic.acad_term_id,
-        space_uuid,
-        account_id,
-        file.originalname,
-        uploadedPath, // full Supabase path
-        file.size, // file size in bytes
-        file.mimetype, // MIME type
-      ];
-
-      await this.db.execute(sql, params); // assuming this.db is a mysql2/promise connection
+      // --- Create file record in MySQL ---
+      const file_id = await this.mysqlFileModel.createFile(
+        c_space_id,
+        space_id,
+        lesson_id,
+        file.originalname, // orig_file_name
+        storage_path, // Supabase path
+        publicUrl, // public URL
+        file.size,
+        file.mimetype,
+      );
 
       return res.json({
         success: true,
+        file_id,
         path: uploadedPath,
         url: publicUrl,
         space_uuid,
+        lesson_id,
+        space_type: c_space_id ? "course_space" : "normal_space",
       });
     } catch (error) {
       console.error(error);

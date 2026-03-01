@@ -197,7 +197,9 @@ class FileController {
       let c_space_id = null;
       let space_id = null;
 
-      if (space) {
+      console.log(space);
+
+      if (space.length > 0) {
         space_id = space[0].space_id; // normal space
       } else {
         space = await this.space.getByCourseSpaceUuid(space_uuid);
@@ -269,10 +271,34 @@ class FileController {
       // const account_
 
       const space_uuid = req.params.space_uuid || "";
-      const files = await this.supabaseModel.listFilesBySpaceUUID(
-        account_id,
-        space_uuid,
-      );
+      let space = await this.space.getBySpaceUuid(space_uuid);
+      // let c_space_id = null;
+      // let space_id = null;
+      let files;
+
+      if (space.length > 0) {
+        files = await this.mysqlFileModel.listResourcesBySpaceId(
+          space[0].space_id,
+        );
+
+        console.log(space);
+      } else {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+        if (!space)
+          return res
+            .status(404)
+            .json({ success: false, message: "Invalid Space UUID" });
+        files = await this.mysqlFileModel.listResourcesByCourseSpaceId(
+          space[0].space_id,
+        );
+      }
+
+      console.log(space);
+
+      // const files = await this.supabaseModel.listFilesBySpaceUUID(
+      //   account_id,
+      //   space_uuid,
+      // );
       return res.json({ success: true, data: files });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });

@@ -104,6 +104,62 @@ class FileModel {
     }
   }
 
+  async listResourcesBySpaceId(space_id) {
+    try {
+      const result = await this.db.execute(
+        `
+        SELECT 
+          l.lesson_id,
+          l.lesson_name,
+          l.created_at,
+          f.file_id,
+          f.orig_file_name AS file_name,
+          f.file_url,
+          f.file_size, 
+          f.file_mimetype
+        FROM lessons l
+        LEFT JOIN files f
+          ON f.lesson_id = l.lesson_id
+        WHERE l.space_id = ?
+        ORDER BY l.created_at DESC
+        `,
+        [space_id],
+      );
+      return result;
+    } catch (err) {
+      this.logger.error("Error getting resources ", { err });
+      throw err;
+    }
+  }
+
+  async listResourcesByCourseSpaceId(c_space_id) {
+    try {
+      const result = await this.db.execute(
+        `
+        SELECT 
+          l.lesson_id,
+          l.lesson_name,
+          l.created_at,
+          f.file_id,
+          f.orig_file_name AS file_name,
+          f.file_url,
+          f.file_size, 
+          f.file_mimetype
+        FROM lessons l
+        LEFT JOIN files f
+          ON f.lesson_id = l.lesson_id
+        WHERE l.c_space_id = ?
+        ORDER BY l.created_at DESC
+        `,
+        [c_space_id],
+      );
+      return result;
+    } catch (err) {
+      this.logger.error("Error getting resources ", { err });
+      throw err;
+    }
+  }
+
   // Create a new file record
   async create_file({
     space_id,

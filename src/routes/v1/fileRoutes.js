@@ -40,7 +40,7 @@ const upload = multer({
 });
 
 fileRouter.use(authorization);
-fileRouter.use(authentication);
+// fileRouter.use(authentication);
 
 const fileController = new FileController();
 

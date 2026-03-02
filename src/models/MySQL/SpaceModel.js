@@ -980,7 +980,7 @@ class Space {
             ON acc.account_id = pr.account_id
         LEFT JOIN academic_term at
             ON csp.acad_term_id = at.acad_term_id
-        WHERE EXISTS (
+        WHERE csp.is_archive = 0 AND EXISTS (
               SELECT 1 
               FROM professors p 
               WHERE p.account_id = csp.created_by
@@ -1415,6 +1415,52 @@ class Space {
       throw err;
     } finally {
       connection.release();
+    }
+  }
+
+  async toggleArchiving(account_id, space_uuid) {
+    const connection = await this.db.getConnection(); // get a transaction connection
+    try {
+      await connection.beginTransaction();
+
+      // 2️⃣ Try course space
+      const [rows] = await connection.query(
+        `SELECT c_space_id, is_archive 
+        FROM course_spaces 
+        WHERE c_space_uuid = ? AND created_by = ? FOR UPDATE`,
+        [space_uuid, account_id],
+      );
+
+      if (rows.length > 0) {
+        const newState = rows[0].is_archive ? 0 : 1;
+
+        console.log(newState);
+
+        await connection.query(
+          `UPDATE course_spaces 
+         SET is_archive = ? 
+         WHERE c_space_id = ? AND created_by = ?`,
+          [newState, rows[0].c_space_id, account_id],
+        );
+
+        await connection.commit();
+        connection.release();
+
+        return {
+          space_id: rows[0].c_space_id,
+          is_archived: newState,
+          type: "course_space",
+        };
+      }
+
+      // 3️⃣ Not found
+      await connection.rollback();
+      connection.release();
+      return null;
+    } catch (err) {
+      await connection.rollback();
+      connection.release();
+      throw err; // let controller handle 500
     }
   }
 }

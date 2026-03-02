@@ -111,4 +111,5 @@ spaceRouter.delete(
 
 spaceRouter.post("/remarks", space.add_remarks.bind(space));
 
+spaceRouter.patch("/:space_uuid/archive", space.set_archiving.bind(space));
 export default spaceRouter;

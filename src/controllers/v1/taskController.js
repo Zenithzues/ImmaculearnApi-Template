@@ -114,7 +114,11 @@ export class TaskController {
       }
 
       // 3️⃣ Call Task model to fetch tasks
-      const tasks = await this.task.getTaskBySpaceUUID(space_id, c_space_id);
+      const tasks = await this.task.getTaskBySpaceUUID(
+        space_id,
+        c_space_id,
+        account_id,
+      );
 
       res.json({
         success: true,

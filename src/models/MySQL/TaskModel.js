@@ -103,18 +103,18 @@ class Task {
    * @param {number} c_space_id - course space
    * @returns {Promise<Array>} List of tasks with unified space_id
    */
-  async getTaskBySpaceUUID(space_id, c_space_id) {
+  async getTaskBySpaceUUID(space_id, c_space_id, account_id) {
     const conn = await this.db.getConnection();
     try {
       const whereClauses = [];
       const values = [];
 
       if (space_id) {
-        whereClauses.push("space_id = ?");
+        whereClauses.push("t.space_id = ?");
         values.push(space_id);
       }
       if (c_space_id) {
-        whereClauses.push("c_space_id = ?");
+        whereClauses.push("t.c_space_id = ?");
         values.push(c_space_id);
       }
 
@@ -132,15 +132,45 @@ class Task {
         t.due_date,
         t.created_at,
         t.updated_at,
-        COUNT(q.question_id) AS question_count
+
+        COUNT(q.question_id) AS question_count,
+
+        ts.account_id,
+        ts.score,
+        ts.max_score,
+
+        CASE
+          WHEN COUNT(ta.answer_id) > 0 THEN 1
+          ELSE 0
+        END AS has_answered
+
       FROM tasks t
       LEFT JOIN task_questions q
-        ON t.task_id = q.task_id
+        ON q.task_id = t.task_id
+
+      -- check if this student answered
+      LEFT JOIN task_answers ta
+        ON ta.task_id = t.task_id
+       AND ta.account_id = ?
+
+      -- final score if submitted
+      LEFT JOIN task_score ts
+        ON ts.task_id = t.task_id
+       AND ts.account_id = ?
+
       WHERE ${whereClauses.join(" OR ")}
-      GROUP BY t.task_id;
+
+      GROUP BY t.task_id
+      ORDER BY t.created_at DESC
     `;
 
-      const [rows] = await conn.execute(sql, values);
+      const params = [
+        account_id ?? null,
+        account_id ?? null,
+        ...values.map((v) => v ?? null),
+      ];
+
+      const [rows] = await conn.execute(sql, params);
       return rows;
     } catch (err) {
       this.logger.error("Error in Task.getTaskBySpaceUUID", err);

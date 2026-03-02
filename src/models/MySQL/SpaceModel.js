@@ -1463,6 +1463,126 @@ class Space {
       throw err; // let controller handle 500
     }
   }
+
+  async getAllCourseSpaceArchived(account_id) {
+    try {
+      const rows = await this.db.execute(
+        `
+        SELECT 
+            csp.c_space_id,
+            csp.c_space_uuid,
+            csp.c_space_name,
+            csp.c_space_description,
+            csp.c_space_day,
+            csp.c_space_time_start,
+            csp.c_space_time_end,
+            csp.c_space_yr_lvl,
+            csp.created_by,
+            CONCAT('[', 
+                GROUP_CONCAT(
+                    CONCAT(
+                        '{"account_id":', acc.account_id,
+                        ',"email":"', IFNULL(acc.email, ''),
+                        '","profile_pic":"', IFNULL(acc.profile_pic, ''),
+                        '","full_name":"', IFNULL(
+                            COALESCE(
+                                CONCAT(st.student_fn, ' ', st.student_ln),
+                                CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                            ), ''
+                        ),
+                        '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd), ''),
+                        '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender), ''),
+                        '","course":"', IFNULL(st.student_course, ''),
+                        '","year_level":"', IFNULL(st.student_yr_lvl, ''),
+                        '","department":"', IFNULL(pr.prof_department, ''),
+                        '","role":"', CASE 
+                            WHEN acc.account_id = csp.created_by THEN 'creator'
+                            WHEN st.account_id IS NOT NULL THEN 'student'
+                            ELSE 'professor'
+                        END,
+                        '"}'
+                    )
+                    SEPARATOR ','
+                ), 
+            ']') AS members,
+            at.acad_term_name,
+            at.semester
+
+        FROM course_spaces csp
+        LEFT JOIN space_members spm
+            ON csp.c_space_id = spm.c_space_id 
+            AND spm.status = 'accepted'
+        LEFT JOIN accounts acc
+            ON acc.account_id = spm.account_id 
+            OR acc.account_id = csp.created_by
+        LEFT JOIN students st
+            ON acc.account_id = st.account_id
+        LEFT JOIN professors pr
+            ON acc.account_id = pr.account_id
+        LEFT JOIN academic_term at
+            ON csp.acad_term_id = at.acad_term_id
+        WHERE csp.is_archive = 1 AND EXISTS (
+              SELECT 1 
+              FROM professors p 
+              WHERE p.account_id = csp.created_by
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM space_members sm
+              INNER JOIN professors p2 
+                  ON sm.account_id = p2.account_id
+              WHERE sm.c_space_id = csp.c_space_id
+                AND sm.status = 'accepted'
+                AND sm.account_id != csp.created_by
+          )
+          AND (
+                csp.created_by = ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM space_members sm2
+                    WHERE sm2.c_space_id = csp.c_space_id
+                    AND sm2.account_id = ?
+                    AND sm2.status = 'accepted'
+                )
+            )
+        GROUP BY 
+            csp.c_space_id,
+            csp.c_space_uuid,
+            csp.c_space_name,
+            csp.c_space_day,
+            csp.c_space_time_start,
+            csp.c_space_time_end,
+            csp.c_space_yr_lvl,
+            csp.created_by
+        ORDER BY csp.created_at DESC;
+        `,
+        [account_id, account_id],
+      );
+
+      // Safely parse the members JSON string into actual array
+      rows.forEach((space) => {
+        try {
+          const membersStr = space.members || "[]";
+          space.members = JSON.parse(membersStr);
+        } catch (e) {
+          space.members = [];
+          this.logger.warn("Failed to parse members JSON", {
+            space_id: space.c_space_id,
+            raw: space.members,
+            error: e.message,
+          });
+        }
+      });
+
+      return rows;
+    } catch (err) {
+      this.logger.error("Error Getting All Course Spaces (students-only)", {
+        account_id,
+        err: err.message || err,
+      });
+      throw err;
+    }
+  }
 }
 
 export default Space;

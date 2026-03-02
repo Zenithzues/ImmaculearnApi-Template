@@ -112,4 +112,5 @@ spaceRouter.delete(
 spaceRouter.post("/remarks", space.add_remarks.bind(space));
 
 spaceRouter.patch("/:space_uuid/archive", space.set_archiving.bind(space));
+spaceRouter.get("/archived", space.get_all_course_space_archived.bind(space));
 export default spaceRouter;

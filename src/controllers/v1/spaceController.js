@@ -1141,6 +1141,58 @@ class SpaceController {
       });
     }
   }
+
+  async get_all_course_space_archived(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+
+      const result = await this.space.getAllCourseSpaceArchived(account_id);
+
+      const spaces = result.map((item) => ({
+        space_id: item.c_space_id,
+        space_uuid: item.c_space_uuid,
+        space_link: `${
+          process.env.NODE_ENV === "production"
+            ? "https://immaculearnapi-template-production.up.railway.app"
+            : "http://localhost:3000"
+        }/space/j?t=${item.c_space_uuid}`,
+        space_name: item.c_space_name,
+        space_description: item.c_space_description,
+        space_day: item.c_space_day,
+        space_time_start: item.c_space_time_start,
+        space_time_end: item.c_space_time_end,
+        space_yr_lvl: item.c_space_yr_lvl,
+        academic_term: item.acad_term_name,
+        academic_semester: item.semester,
+        // space_description: item.description,
+        // space_type: item.space_type,
+        creator: item.created_by,
+        members: item.members.map((member) => ({
+          ...member,
+          full_name: maskFullName(member.full_name),
+          email: maskEmail(member.email), // <-- mask email
+        })),
+      }));
+
+      // console.log(spaces)
+
+      res.json({
+        success: true,
+        message: "Successfully get all course Spaces",
+        data: spaces,
+      });
+    } catch (err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
 }
 
 export default SpaceController;

@@ -170,6 +170,38 @@ export class TaskController {
     }
   }
 
+  async submit_task_answer(req, res) {
+    try {
+      const account_id = res.locals.account_id || 12;
+      const { task_id, answers } = req.body;
+
+      if (!account_id || !task_id || !Array.isArray(answers)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid request",
+        });
+      }
+
+      const result = await this.task.submitTaskAnswer({
+        task_id,
+        account_id,
+        answers,
+      });
+
+      return res.json({
+        success: true,
+        message: "Task submitted successfully",
+        data: result,
+      });
+    } catch (err) {
+      this.logger.error("Error submitting task", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Submission failed",
+      });
+    }
+  }
+
   async upload_task(req, res) {
     try {
       const {

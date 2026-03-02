@@ -20,6 +20,11 @@ taskRouter.get(
   "/questions/:task_id",
   taskController.get_questions_by_task_id.bind(taskController),
 );
+
+taskRouter.post(
+  "/answer",
+  taskController.submit_task_answer.bind(taskController),
+);
 taskRouter.post("/upload", taskController.upload_task.bind(taskController));
 taskRouter.post("/draft", taskController.draft_task.bind(taskController));
 taskRouter.get(

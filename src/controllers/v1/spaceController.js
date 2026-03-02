@@ -766,6 +766,7 @@ class SpaceController {
             : "http://localhost:3000"
         }/space/j?t=${item.c_space_uuid}`,
         space_name: item.c_space_name,
+        space_description: item.c_space_description,
         space_day: item.c_space_day,
         space_time_start: item.c_space_time_start,
         space_time_end: item.c_space_time_end,

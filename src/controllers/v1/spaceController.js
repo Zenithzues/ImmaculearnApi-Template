@@ -78,6 +78,7 @@ class SpaceController {
           .json({ success: false, message: "UnAuthenticated User!" });
       const {
         space_name,
+        space_description,
         space_day,
         space_time_start,
         space_time_end,
@@ -117,6 +118,7 @@ class SpaceController {
         account_id,
         academic.acad_term_id,
         space_name,
+        space_description,
         space_day,
         space_time_start,
         space_time_end,

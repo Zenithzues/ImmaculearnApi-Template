@@ -144,6 +144,7 @@ class Space {
     account_id,
     acad_term_id,
     space_name,
+    space_description,
     space_day,
     space_time_start,
     space_time_end,
@@ -152,12 +153,13 @@ class Space {
   ) {
     try {
       const query = `
-      INSERT INTO course_spaces (acad_term_id, c_space_uuid, c_space_name, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) 
-      VALUES (?, UUID(), ?, ?, ?, ?, ?, ?, ?, NOW())
+      INSERT INTO course_spaces (acad_term_id, c_space_uuid, c_space_name, c_space_description, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) 
+      VALUES (?, UUID(), ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `;
       const result = await this.db.execute(query, [
         acad_term_id,
         space_name,
+        space_description,
         space_day,
         space_time_start,
         space_time_end,
@@ -929,6 +931,7 @@ class Space {
             csp.c_space_id,
             csp.c_space_uuid,
             csp.c_space_name,
+            csp.c_space_description,
             csp.c_space_day,
             csp.c_space_time_start,
             csp.c_space_time_end,

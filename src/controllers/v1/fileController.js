@@ -9,6 +9,7 @@ import MysqlFileModel from "../../models/MySQL/FileModel.js";
 import FileModelSupabase from "../../models/Supabase/FileModel.js";
 import AdminModel from "../../models/MySQL/AdminModel.js";
 import Space from "../../models/MySQL/SpaceModel.js";
+import { Logger } from "../../utils/Logger.js";
 
 class FileController {
   constructor() {
@@ -16,6 +17,7 @@ class FileController {
     this.acadTerm = new AdminModel();
     this.mysqlFileModel = new MysqlFileModel();
     this.supabaseModel = new FileModelSupabase("IMMACULEARN");
+    this.logger = new Logger();
   }
 
   async create(req, res) {
@@ -307,34 +309,56 @@ class FileController {
 
   async deleteResource(req, res) {
     try {
-      const account_id = res.locals.account_id || 1; // make sure it's a string
+      const account_id = res.locals.account_id || 1;
 
-      if (!account_id)
+      if (!account_id) {
         return res
           .status(401)
           .json({ success: false, message: "UnAuthenticated User." });
+      }
 
-      const { filename } = req.body;
+      const { file_id, lesson_id } = req.body;
 
-      // Validate filename exists
-      if (!filename) {
+      if (!file_id || !lesson_id) {
         return res
           .status(400)
-          .json({ success: false, message: "filename required" });
+          .json({ success: false, message: "Invalid Request." });
       }
 
-      // Check ownership: filename should start with account_id
-      if (!filename.startsWith(`${account_id}-`)) {
+      // 1. Fetch file (joined to lesson for safety)
+      const file = await this.mysqlFileModel.getFileByIdAndLesson(
+        file_id,
+        lesson_id,
+      );
+
+      if (!file) {
+        return res
+          .status(404)
+          .json({ success: false, message: "File not found." });
+      }
+
+      const { storage_path, owner_id } = file;
+
+      // 2. Ownership check
+      if (Number(owner_id) !== Number(account_id)) {
         return res
           .status(403)
-          .json({ success: false, message: "Invalid request: Not your file" });
+          .json({ success: false, message: "Access denied." });
       }
 
-      await this.supabaseModel.deleteFileByName(filename);
+      // 3. Delete DB record
+      // await this.mysqlFileModel.deleteFile(file_id, lesson_id);
+      await this.mysqlFileModel.deleteLesson(lesson_id);
 
-      return res.json({ success: true, message: "File deleted" });
+      // 4. Delete from Supabase
+      await this.supabaseModel.deleteFileByPath(storage_path);
+
+      return res.json({
+        success: true,
+        message: "File deleted successfully",
+      });
     } catch (error) {
-      console.error(error);
+      this.logger.error("Error deleting file", error);
       return res.status(500).json({ success: false, message: error.message });
     }
   }

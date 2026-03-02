@@ -8,12 +8,166 @@ import { Logger } from "../../utils/Logger.js";
 import { Validator } from "../../utils/Validator.js";
 import User from "../../models/MySQL/UserModel.js";
 import Task from "../../models/MySQL/TaskModel.js";
+import Space from "../../models/MySQL/SpaceModel.js";
 import { createFile } from "../../services/fileService.js";
 
 export class TaskController {
   constructor() {
     this.task = new Task();
+    this.space = new Space();
     this.logger = new Logger("TaskController");
+  }
+
+  async create_task(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const { space_uuid, taskData } = req.body || {};
+      console.log(space_uuid, taskData);
+      if (!taskData || !space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing task data or space_uuid.",
+        });
+      }
+
+      if (!taskData.lesson_id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Must have Related Lesson" });
+
+      let space = await this.space.getBySpaceUuid(space_uuid);
+      let c_space_id = null;
+      let space_id = null;
+
+      console.log(space);
+
+      if (space.length > 0) {
+        space_id = space[0].space_id; // normal space
+      } else {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+        if (!space)
+          return res
+            .status(404)
+            .json({ success: false, message: "Space not found" });
+
+        c_space_id = space[0].space_id; // course space
+      }
+
+      // Call model to insert task + questions + choices
+      const taskId = await this.task.createTask(taskData, space_id, c_space_id);
+
+      res.json({
+        success: true,
+        message: "Successfully created task",
+        task_id: taskId,
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.createTask", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Create task failed.",
+      });
+    }
+  }
+
+  async get_task_by_space_uuid(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const space_uuid = req.params.space_uuid || "";
+
+      console.log(space_uuid);
+
+      // 1️⃣ Lookup normal space
+      let space = await this.space.getBySpaceUuid(space_uuid);
+      let space_id = null;
+      let c_space_id = null;
+
+      // console.log(space);
+      if (space.length > 0) {
+        space_id = space[0].space_id; // normal space
+      } else {
+        // 2️⃣ Lookup course space
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+        console.log(space);
+
+        if (!space || space.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "Space not found",
+          });
+        }
+        c_space_id = space[0].space_id; // course space
+      }
+
+      // 3️⃣ Call Task model to fetch tasks
+      const tasks = await this.task.getTaskBySpaceUUID(space_id, c_space_id);
+
+      res.json({
+        success: true,
+        message: "Successfully fetched tasks",
+        data: tasks, // array of tasks with unified space_id
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.get_task_by_space_uuid", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to fetch tasks",
+      });
+    }
+  }
+
+  async get_questions_by_task_id(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const task_id = req.params.task_id;
+
+      if (!task_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid task id.",
+        });
+      }
+
+      // Fetch questions from model
+      const questions = await this.task.getQuestionsByTaskId(task_id);
+
+      return res.json({
+        success: true,
+        message: "Successfully fetched questions",
+        data: questions,
+      });
+    } catch (err) {
+      this.logger.error(
+        "Error in TaskController.get_questions_by_task_id",
+        err,
+      );
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to fetch questions",
+      });
+    }
   }
 
   async upload_task(req, res) {

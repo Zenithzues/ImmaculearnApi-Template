@@ -31,6 +31,14 @@ class FileModelSupabase {
     return data.publicUrl;
   }
 
+  async deleteFileByPath(storage_path) {
+    const { error } = await this.supabase.storage
+      .from(this.bucket)
+      .remove([storage_path]);
+
+    if (error) throw error;
+  }
+
   // Delete file
   async deleteFile(filePath) {
     const { error } = await this.supabase.storage

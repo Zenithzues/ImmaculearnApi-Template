@@ -160,6 +160,42 @@ class FileModel {
     }
   }
 
+  async getFileByIdAndLesson(file_id, lesson_id) {
+    try {
+      const sql = `
+      SELECT 
+        f.file_id,
+        f.storage_path,
+        COALESCE(s.created_by, cs.created_by) AS owner_id
+      FROM files f
+      INNER JOIN lessons l 
+        ON l.lesson_id = f.lesson_id
+      LEFT JOIN spaces s 
+        ON s.space_id = f.space_id
+      LEFT JOIN course_spaces cs 
+        ON cs.c_space_id = f.c_space_id
+      WHERE f.file_id = ? 
+        AND f.lesson_id = ?
+      LIMIT 1
+    `;
+
+      const rows = await this.db.execute(sql, [file_id, lesson_id]);
+
+      return rows.length ? rows[0] : null;
+    } catch (err) {
+      this.logger.error("Error fetching file", { err });
+      throw err;
+    }
+  }
+
+  async deleteLesson(lesson_id) {
+    const sql = `
+    DELETE FROM lessons
+    WHERE lesson_id = ?
+  `;
+    await this.db.execute(sql, [lesson_id]);
+  }
+
   // Create a new file record
   async create_file({
     space_id,

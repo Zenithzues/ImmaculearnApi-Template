@@ -56,7 +56,7 @@ fileRouter.post(
 );
 
 fileRouter.delete(
-  "/resources/delete",
+  "/resources",
   fileController.deleteResource.bind(fileController),
 );
 

@@ -1,10 +1,11 @@
 // import jwt from "jsonwebtoken";
 // import User from "../../models/user.js";
+import crypto from "crypto";
 
 import AdminModel from "../../models/MySQL/AdminModel.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 import { Logger } from "../../utils/Logger.js";
-import { generateAdminAccessToken } from "../../utils/tokens.js";
+import { generateAdminAccessToken ,generateRefreshToken} from "../../utils/tokens.js";
 
 /**
  * Optional
@@ -110,6 +111,7 @@ class AdminController {
       return res.status(200).json({
         success: true,
         message: "Welcome Back Admin!",
+        accessToken: adminAccessToken,
       });
     } catch (err) {
       console.error("Login error:", err);

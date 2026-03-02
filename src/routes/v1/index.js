@@ -12,6 +12,7 @@ import regemailRouter from "./registerstudentemailRoutes.js";
 import regprofemailRouter from "./registerprofemailRoutes.js";
 import postRouter from "./postRoutes.js";
 import adminRouter from "./adminRoutes.js";
+import announceRouter from "./announceRoutes.js";
 
 const v1 = new Router();
 
@@ -28,5 +29,6 @@ v1.use("/", homeRouter);
 
 v1.use("/register_student", regemailRouter);
 v1.use("/register_prof", regprofemailRouter);
+v1.use("/announce", announceRouter);
 
 export default v1;

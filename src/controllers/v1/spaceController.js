@@ -776,6 +776,7 @@ class SpaceController {
         // space_description: item.description,
         // space_type: item.space_type,
         creator: item.created_by,
+        professor: item.professor,
         members: item.members.map((member) => ({
           ...member,
           full_name: maskFullName(member.full_name),

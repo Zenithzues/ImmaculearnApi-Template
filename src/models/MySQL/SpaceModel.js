@@ -937,6 +937,10 @@ class Space {
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
             csp.created_by,
+            CONCAT(
+              '{"name":"', creator_prof.prof_fn, ' ', creator_prof.prof_ln,
+              '","avatar":"', IFNULL(creator_acc.profile_pic, ''), '"}'
+            ) AS professor,
             CONCAT('[', 
                 GROUP_CONCAT(
                     CONCAT(
@@ -977,6 +981,10 @@ class Space {
             ON acc.account_id = st.account_id
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
+        LEFT JOIN professors creator_prof
+            ON creator_prof.account_id = csp.created_by
+        LEFT JOIN accounts creator_acc
+            ON creator_acc.account_id = csp.created_by
         LEFT JOIN academic_term at
             ON csp.acad_term_id = at.acad_term_id
         WHERE csp.is_archive = 0 AND EXISTS (
@@ -1021,7 +1029,9 @@ class Space {
       rows.forEach((space) => {
         try {
           const membersStr = space.members || "[]";
+          const profStr = space.professor || "[]";
           space.members = JSON.parse(membersStr);
+          space.professor = JSON.parse(profStr);
         } catch (e) {
           space.members = [];
           this.logger.warn("Failed to parse members JSON", {

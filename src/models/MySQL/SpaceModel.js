@@ -972,8 +972,7 @@ class Space {
             ON csp.c_space_id = spm.c_space_id 
             AND spm.status = 'accepted'
         LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id 
-            OR acc.account_id = csp.created_by
+            ON acc.account_id = spm.account_id
         LEFT JOIN students st
             ON acc.account_id = st.account_id
         LEFT JOIN professors pr

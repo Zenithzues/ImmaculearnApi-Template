@@ -318,15 +318,13 @@ class Task {
   async submitTaskAnswer({ task_id, account_id, answers }) {
     const conn = await this.db.getConnection();
 
-    console.log(task_id, account_id, answers);
-
     try {
       await conn.beginTransaction();
 
       let totalScore = 0;
       let maxScore = answers.length;
 
-      // 1️⃣ Save answers
+      // 1️⃣ Save all answers
       for (const ans of answers) {
         await conn.execute(
           `
@@ -337,72 +335,107 @@ class Task {
             choice_id = VALUES(choice_id),
             answer_text = VALUES(answer_text),
             answered_at = CURRENT_TIMESTAMP
-        `,
+          `,
           [
             task_id,
             ans.question_id,
             account_id,
-            ans.choice_id ?? null,
+            ans.choice_id != null && !isNaN(ans.choice_id)
+              ? Number(ans.choice_id)
+              : null,
             ans.answer_text ?? null,
           ],
         );
       }
 
       // 2️⃣ Auto-grade MCQs
-      const graded = await conn.execute(
+      const mcqGraded = await conn.execute(
         `
-        SELECT
-          ta.question_id,
-          ta.account_id,
-          tc.is_right_answer
-        FROM task_answers ta
-        JOIN task_choices tc
-          ON tc.choice_id = ta.choice_id
-        WHERE ta.task_id = ?
-          AND ta.account_id = ?
-      `,
+      SELECT
+        ta.question_id,
+        ta.account_id,
+        tc.is_right_answer
+      FROM task_answers ta
+      JOIN task_choices tc
+        ON tc.choice_id = ta.choice_id
+      WHERE ta.task_id = ?
+        AND ta.account_id = ?
+    `,
         [task_id, account_id],
       );
 
-      console.log(graded);
-
-      for (const row of graded[0]) {
+      for (const row of mcqGraded[0]) {
         const score = row.is_right_answer ? 1 : 0;
         totalScore += score;
 
         await conn.execute(
           `
-          INSERT INTO task_question_score
-            (task_id, question_id, account_id, is_correct, score)
-          VALUES (?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            is_correct = VALUES(is_correct),
-            score = VALUES(score)
-        `,
+        INSERT INTO task_question_score
+          (task_id, question_id, account_id, is_correct, score)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          is_correct = VALUES(is_correct),
+          score = VALUES(score)
+      `,
           [task_id, row.question_id, account_id, row.is_right_answer, score],
         );
       }
 
-      // 3️⃣ Save final task score
+      // 3️⃣ Auto-grade text answers
+      const textAnswers = await conn.execute(
+        `
+      SELECT
+        ta.question_id,
+        ta.answer_text,
+        tq.identification_answer
+      FROM task_answers ta
+      JOIN task_questions tq
+        ON tq.question_id = ta.question_id
+      WHERE ta.task_id = ?
+        AND ta.account_id = ?
+        AND ta.choice_id IS NULL
+        AND ta.answer_text IS NOT NULL
+    `,
+        [task_id, account_id],
+      );
+
+      for (const row of textAnswers[0]) {
+        const isCorrect =
+          row.answer_text.trim().toLowerCase() ===
+          row.identification_answer.trim().toLowerCase();
+        const score = isCorrect ? 1 : 0;
+        totalScore += score;
+
+        await conn.execute(
+          `
+        INSERT INTO task_question_score
+          (task_id, question_id, account_id, is_correct, score)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          is_correct = VALUES(is_correct),
+          score = VALUES(score)
+      `,
+          [task_id, row.question_id, account_id, isCorrect, score],
+        );
+      }
+
+      // 4️⃣ Save final task score
       await conn.execute(
         `
-        INSERT INTO task_score
-          (task_id, account_id, score, max_score)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          score = VALUES(score),
-          max_score = VALUES(max_score),
-          submitted_at = CURRENT_TIMESTAMP
-      `,
+      INSERT INTO task_score
+        (task_id, account_id, score, max_score)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        score = VALUES(score),
+        max_score = VALUES(max_score),
+        submitted_at = CURRENT_TIMESTAMP
+    `,
         [task_id, account_id, totalScore, maxScore],
       );
 
       await conn.commit();
 
-      return {
-        score: totalScore,
-        max_score: maxScore,
-      };
+      return { score: totalScore, max_score: maxScore };
     } catch (err) {
       await conn.rollback();
       throw err;

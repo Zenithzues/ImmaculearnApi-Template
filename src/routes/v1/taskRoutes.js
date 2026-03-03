@@ -8,7 +8,7 @@ const taskRouter = new Router();
 const taskController = new TaskController();
 
 taskRouter.use(authorization);
-// taskRouter.use(authentication);
+taskRouter.use(authentication);
 
 taskRouter.post("/", taskController.create_task.bind(taskController));
 taskRouter.get(

@@ -18,6 +18,6 @@ router.get("/:announce_id", announcementController.get_announcement_by_id.bind(a
 router.put("/:announce_id", announcementController.update_announcement.bind(announcementController));
 
 // Delete an announcement by ID
-router.delete("/:announce_id", announcementController.delete_announcement.bind(announcementController));
+router.delete("/delete/:announce_id", announcementController.delete_announcement.bind(announcementController));
 
 export default router;

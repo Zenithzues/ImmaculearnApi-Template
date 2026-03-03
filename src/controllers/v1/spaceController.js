@@ -1079,7 +1079,10 @@ class SpaceController {
             "Invalid Request, Must be one of the Grading Period is not Null",
         });
 
+      const academic = await this.acadTerm.getLatestAcademicTerm();
+
       await this.space.addRemarksToStudentById(
+        academic.acad_term_id,
         student_id,
         account_id,
         space_uuid,
@@ -1092,6 +1095,40 @@ class SpaceController {
       res.json({
         success: true,
         message: `Added Remarks Successfully.`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+
+  async get_remarks_by_space_uuid(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User." });
+
+      const { space_uuid } = req.params || {};
+
+      if (!space_uuid)
+        return res.status(404).json({
+          success: false,
+          message: "Invalid Request, Space UUID required.",
+        });
+
+      const remarks = await this.space.getRemarksBySpaceUUID(
+        account_id,
+        space_uuid,
+      );
+
+      res.json({
+        success: true,
+        message: `Getting Remarks Successfully.`,
+        data: remarks,
       });
     } catch (err) {
       res.status(500).json({

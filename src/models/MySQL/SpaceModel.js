@@ -1343,6 +1343,7 @@ class Space {
    * THIS IS FOR PROFESSOR ADDING GRADE
    */
   async addRemarksToStudentById(
+    acad_term_id,
     student_id,
     prof_id,
     space_uuid,
@@ -1351,18 +1352,8 @@ class Space {
     prefinals = null,
   ) {
     // Build update data dynamically
-    const updateData = {};
-    if (prelim != null) updateData.prelim = prelim;
-    if (midterm != null) updateData.midterm = midterm;
-    if (prefinals != null) updateData.prefinals = prefinals;
-
-    if (Object.keys(updateData).length === 0) {
-      throw new Error("No grading periods provided to update.");
-    }
 
     const connection = await this.db.getConnection();
-
-    console.log(updateData);
 
     try {
       await connection.beginTransaction();
@@ -1387,37 +1378,92 @@ class Space {
 
       if (existingRemark[0].length > 0) {
         // Update existing remark
-        const fields = [];
-        const values = [];
-
-        for (const key in updateData) {
-          fields.push(`${key} = ?`);
-          values.push(updateData[key]);
-        }
-
-        values.push(c_space_id, student_id);
 
         await connection.execute(
-          `UPDATE remarks SET ${fields.join(", ")} WHERE c_space_id = ? AND account_id = ?`,
-          values,
+          `UPDATE remarks SET prelim = ?, midterm = ? , prefinals = ? WHERE c_space_id = ? AND account_id = ?`,
+          [prelim, midterm, prefinals, c_space_id, student_id],
         );
       } else {
         // Insert new remark
         await connection.execute(
-          `INSERT INTO remarks (c_space_id, prof_id, account_id, prelim, midterm, prefinals, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          `INSERT INTO remarks (acad_term_id, c_space_id, prof_id, account_id, prelim, midterm, prefinals, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
+            acad_term_id,
             c_space_id,
             prof_id,
             student_id,
-            updateData.prelim ?? null,
-            updateData.midterm ?? null,
-            updateData.prefinals ?? null,
+            prelim,
+            midterm,
+            prefinals,
           ],
         );
       }
 
       await connection.commit();
       return true;
+    } catch (err) {
+      await connection.rollback();
+      this.logger.error("Error in remarksAddByStudentId:", err);
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getRemarksBySpaceUUID(prof_id, space_uuid) {
+    // Build update data dynamically
+
+    const connection = await this.db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Get the course space ID
+      const courseSpaceRows = await connection.execute(
+        "SELECT c_space_id FROM course_spaces WHERE c_space_uuid = ? AND created_by = ?",
+        [space_uuid, prof_id],
+      );
+
+      if (courseSpaceRows[0].length === 0) {
+        throw new Error("Course space not found.");
+      }
+
+      const c_space_id = courseSpaceRows[0][0].c_space_id;
+
+      // Check if remark already exists
+      const remarks = await connection.execute(
+        `SELECT 
+            sm.account_id,
+            CONCAT(s.student_fn, ' ', s.student_ln) AS fullname,
+            r.prelim,
+            r.midterm,
+            r.prefinals
+        FROM space_members sm
+        INNER JOIN students s
+            ON s.account_id = sm.account_id
+        LEFT JOIN remarks r
+            ON r.account_id = sm.account_id
+            AND r.c_space_id = sm.c_space_id
+        WHERE sm.c_space_id = ?;
+        `,
+
+        [c_space_id],
+      );
+
+      const formatted = remarks[0].map((row) => ({
+        account_id: row.account_id,
+        fullname: row.fullname,
+        grades: {
+          prelim: row.prelim,
+          midterm: row.midterm,
+          prefinals: row.prefinals,
+        },
+      }));
+
+      console.log(formatted);
+
+      await connection.commit();
+      return formatted;
     } catch (err) {
       await connection.rollback();
       this.logger.error("Error in remarksAddByStudentId:", err);

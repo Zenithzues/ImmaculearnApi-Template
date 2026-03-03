@@ -109,6 +109,10 @@ spaceRouter.delete(
   space.remove_user_from_space.bind(space),
 );
 
+spaceRouter.get(
+  "/remarks/:space_uuid",
+  space.get_remarks_by_space_uuid.bind(space),
+);
 spaceRouter.post("/remarks", space.add_remarks.bind(space));
 
 spaceRouter.patch("/:space_uuid/archive", space.set_archiving.bind(space));

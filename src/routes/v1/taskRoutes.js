@@ -8,7 +8,7 @@ const taskRouter = new Router();
 const taskController = new TaskController();
 
 taskRouter.use(authorization);
-taskRouter.use(authentication);
+// taskRouter.use(authentication);
 
 taskRouter.post("/", taskController.create_task.bind(taskController));
 taskRouter.get(
@@ -17,6 +17,15 @@ taskRouter.get(
 );
 
 taskRouter.get("/", taskController.get_all_task.bind(taskController));
+
+taskRouter.get(
+  "/:task_id/respondents",
+  taskController.get_all_respondents_by_task_id.bind(taskController),
+);
+taskRouter.get(
+  "/:task_id/respondents/:student_id",
+  taskController.get_task_respondent_by_student_id.bind(taskController),
+);
 
 taskRouter.get(
   "/questions/:task_id",

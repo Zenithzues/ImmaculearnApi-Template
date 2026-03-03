@@ -49,16 +49,17 @@ class Task {
         taskId,
         q.question_type,
         q.question,
+        q.identification_answer,
         q.point,
         idx + 1, // position
       ]);
 
-      const [questionResult] = await conn.query(
-        `INSERT INTO task_questions (task_id, question_type, question, point, position) VALUES ?`,
+      const questionResult = await conn.query(
+        `INSERT INTO task_questions (task_id, question_type, question, identification_answer, point, position) VALUES ?`,
         [questionRows],
       );
 
-      const firstQuestionId = questionResult.insertId;
+      const firstQuestionId = questionResult[0].insertId;
       const questionIds = taskData.questions.map(
         (_, idx) => firstQuestionId + idx,
       );
@@ -66,7 +67,11 @@ class Task {
       // Batch insert choices (MCQ)
       const choiceRows = [];
       taskData.questions.forEach((q, qIdx) => {
-        if (q.question_type === "mcq" && Array.isArray(q.choices)) {
+        if (
+          (q.question_type === "mcq" || q.question_type === "true-false") &&
+          Array.isArray(q.choices) &&
+          q.choices.length > 0
+        ) {
           const questionId = questionIds[qIdx];
           q.choices.forEach((c) => {
             choiceRows.push([
@@ -264,6 +269,7 @@ class Task {
         q.task_id,
         q.question,
         q.question_type,
+        q.point,
         q.position AS order_no,
         c.choice_id,
         c.letter_identifier,
@@ -286,6 +292,7 @@ class Task {
             question_id: row.question_id,
             task_id: row.task_id,
             question: row.question,
+            point: row.point,
             question_type: row.question_type,
             order_no: row.order_no,
             choices: [],

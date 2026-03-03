@@ -104,6 +104,67 @@ export class TaskController {
     }
   }
 
+  async get_all_respondents_by_task_id(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const task_id = req.params.task_id;
+
+      if (!task_id && typeof task_id !== "number")
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Task ID." });
+
+      // 3️⃣ Call Task model to fetch tasks
+      const tasks = await this.task.getAllTasks(account_id);
+
+      res.json({
+        success: true,
+        message: "Successfully fetched tasks",
+        data: tasks, // array of tasks with unified space_id
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.get_task_by_space_uuid", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to fetch tasks",
+      });
+    }
+  }
+
+  async get_task_respondent_by_student_id(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      // 3️⃣ Call Task model to fetch tasks
+      const tasks = await this.task.getAllTasks(account_id);
+
+      res.json({
+        success: true,
+        message: "Successfully fetched tasks",
+        data: tasks, // array of tasks with unified space_id
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.get_task_by_space_uuid", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to fetch tasks",
+      });
+    }
+  }
+
   async get_task_by_space_uuid(req, res) {
     try {
       const account_id = res.locals.account_id || 1;
@@ -212,6 +273,8 @@ export class TaskController {
           message: "Invalid request",
         });
       }
+
+      console.log(answers);
 
       const result = await this.task.submitTaskAnswer({
         task_id,

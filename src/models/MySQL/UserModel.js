@@ -529,7 +529,8 @@ class ProfessorFinder {
             acc.account_id,
             acc.email,
             acc.profile_pic,
-            CONCAT(pr.prof_fn, ' ', pr.prof_ln) AS full_name,
+            pr.prof_fn,
+            pr.prof_ln,
             pr.prof_bd AS birth_date,
             pr.prof_gender AS gender,
             pr.prof_department AS department

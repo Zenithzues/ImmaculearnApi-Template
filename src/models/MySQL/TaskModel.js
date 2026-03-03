@@ -103,6 +103,82 @@ class Task {
    * @param {number} c_space_id - course space
    * @returns {Promise<Array>} List of tasks with unified space_id
    */
+  async getAllTasks(account_id) {
+    const conn = await this.db.getConnection();
+    try {
+      const sql = `
+      SELECT 
+        t.task_id,
+        COALESCE(t.space_id, t.c_space_id) AS space_id,
+        t.task_category,
+        t.task_title,
+        t.task_instruction,
+        t.lesson_id,
+        t.total_score,
+        t.due_date,
+        t.created_at,
+        t.updated_at,
+
+        COUNT(q.question_id) AS question_count,
+
+        ts.account_id,
+        ts.score,
+        ts.max_score,
+
+        CASE
+          WHEN COUNT(ta.answer_id) > 0 THEN 1
+          ELSE 0
+        END AS has_answered
+
+      FROM tasks t
+
+      LEFT JOIN space_members sm
+        ON (sm.space_id = t.space_id OR sm.c_space_id = t.c_space_id)
+
+      LEFT JOIN spaces s
+        ON s.space_id = t.space_id
+
+      LEFT JOIN course_spaces cs
+        ON cs.c_space_id = t.c_space_id
+
+      LEFT JOIN task_questions q
+        ON q.task_id = t.task_id
+
+      LEFT JOIN task_answers ta
+        ON ta.task_id = t.task_id
+      AND ta.account_id = ?
+
+      LEFT JOIN task_score ts
+        ON ts.task_id = t.task_id
+      AND ts.account_id = ?
+
+      WHERE
+        sm.account_id = ?
+        OR s.created_by = ?
+        OR cs.created_by = ?
+
+      GROUP BY t.task_id
+      ORDER BY t.created_at DESC
+    `;
+
+      const params = [
+        account_id, // ta.account_id
+        account_id, // ts.account_id
+        account_id, // sm.account_id
+        account_id, // s.created_by
+        account_id, // cs.created_by
+      ];
+
+      const [rows] = await conn.execute(sql, params);
+      return rows;
+    } catch (err) {
+      this.logger.error("Error in Task.getAllTasks", err);
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
   async getTaskBySpaceUUID(space_id, c_space_id, account_id) {
     const conn = await this.db.getConnection();
     try {

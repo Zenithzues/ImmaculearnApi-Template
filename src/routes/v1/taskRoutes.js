@@ -8,13 +8,15 @@ const taskRouter = new Router();
 const taskController = new TaskController();
 
 taskRouter.use(authorization);
-taskRouter.use(authentication);
+// taskRouter.use(authentication);
 
 taskRouter.post("/", taskController.create_task.bind(taskController));
 taskRouter.get(
   "/:space_uuid",
   taskController.get_task_by_space_uuid.bind(taskController),
 );
+
+taskRouter.get("/", taskController.get_all_task.bind(taskController));
 
 taskRouter.get(
   "/questions/:task_id",

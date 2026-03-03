@@ -110,6 +110,10 @@ spaceRouter.delete(
 );
 
 spaceRouter.get(
+  "/remarks/:space_uuid/:user_id",
+  space.get_user_remarks_by_space_uuid.bind(space),
+);
+spaceRouter.get(
   "/remarks/:space_uuid",
   space.get_remarks_by_space_uuid.bind(space),
 );

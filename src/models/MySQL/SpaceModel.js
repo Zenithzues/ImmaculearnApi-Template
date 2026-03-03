@@ -1473,6 +1473,56 @@ class Space {
     }
   }
 
+  async getUserRemarksBySpaceUUID(prof_id, user_id, space_uuid) {
+    const connection = await this.db.getConnection();
+
+    try {
+      // Get course space ID
+      const courseSpaceRows = await connection.execute(
+        `SELECT c_space_id 
+       FROM course_spaces 
+       WHERE c_space_uuid = ?`,
+        [space_uuid],
+      );
+
+      if (courseSpaceRows[0].length === 0) {
+        throw new Error("Course space not found.");
+      }
+
+      const c_space_id = courseSpaceRows[0][0].c_space_id;
+
+      const remarks = await connection.execute(
+        `SELECT 
+          r.account_id,
+          CONCAT(s.student_fn, ' ', s.student_ln) AS fullname,
+          r.prelim,
+          r.midterm,
+          r.prefinals
+       FROM remarks r
+       INNER JOIN students s
+         ON s.account_id = r.account_id
+       WHERE r.c_space_id = ? 
+         AND r.account_id = ?`,
+        [c_space_id, user_id],
+      );
+
+      return remarks[0].map((row) => ({
+        account_id: row.account_id,
+        fullname: row.fullname,
+        grades: {
+          prelim: row.prelim,
+          midterm: row.midterm,
+          prefinals: row.prefinals,
+        },
+      }));
+    } catch (err) {
+      this.logger.error("Error in getUserRemarksBySpaceUUID:", err);
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   async toggleArchiving(account_id, space_uuid) {
     const connection = await this.db.getConnection(); // get a transaction connection
     try {

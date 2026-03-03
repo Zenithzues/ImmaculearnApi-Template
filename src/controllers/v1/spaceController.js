@@ -1137,6 +1137,64 @@ class SpaceController {
       });
     }
   }
+  async get_user_remarks_by_space_uuid(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthenticated User.",
+        });
+      }
+
+      const { space_uuid, user_id } = req.params;
+
+      if (!space_uuid || !user_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Space UUID and User ID are required.",
+        });
+      }
+
+      // Students should only be able to fetch their own remarks.
+      // Allow course space owner (professor) to fetch by user_id as well.
+      if (Number(account_id) !== Number(user_id)) {
+        const courseSpace = await this.space.getByCourseSpaceUuid(space_uuid);
+
+        if (!courseSpace || courseSpace.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "Invalid space.",
+          });
+        }
+
+        if (Number(courseSpace[0].created_by) !== Number(account_id)) {
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden.",
+          });
+        }
+      }
+
+      const remarks = await this.space.getUserRemarksBySpaceUUID(
+        account_id,
+        user_id,
+        space_uuid,
+      );
+
+      return res.json({
+        success: true,
+        message: "Getting Remarks Successfully.",
+        data: remarks,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
 
   async set_archiving(req, res) {
     try {

@@ -156,7 +156,49 @@ class AnnouncementController {
     }
   }
 
-  // ✅ DELETE
+  // GET STUDENT ANNOUNCEMENTS
+  async get_student_announcements(req, res) {
+    try {
+      const announcements = await this.announcementModel.getStudentAnnouncements();
+
+      return res.status(200).json({
+        success: true,
+        message: "Student announcements retrieved successfully",
+        total: announcements.length,
+        data: announcements,
+      });
+
+    } catch (err) {
+      this.logger.error("Error in get_student_announcements", { err });
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+
+  // GET PROFESSOR ANNOUNCEMENTS
+  async get_professor_announcements(req, res) {
+    try {
+      const announcements = await this.announcementModel.getProfessorAnnouncements();
+
+      return res.status(200).json({
+        success: true,
+        message: "Professor announcements retrieved successfully",
+        total: announcements.length,
+        data: announcements,
+      });
+
+    } catch (err) {
+      this.logger.error("Error in get_professor_announcements", { err });
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
+    }
+  }
+
+  // DELETE
   async delete_announcement(req, res) {
     try {
       const { announce_id } = req.params;

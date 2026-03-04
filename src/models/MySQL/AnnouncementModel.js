@@ -146,7 +146,59 @@ class Announcement {
     }
   }
 
-  // ✅ DELETE ANNOUNCEMENT
+  // GET STUDENT ANNOUNCEMENTS
+  async getStudentAnnouncements() {
+    const conn = await this.db.getConnection();
+
+    try {
+      const query = `
+        SELECT *
+        FROM announcements
+        WHERE is_published = 1 
+        AND (target_audience = 'STUDENTS' OR target_audience = 'ALL')
+        ORDER BY announce_id DESC 
+        LIMIT 10
+      `;
+
+      const [rows] = await conn.execute(query);
+      return rows;
+
+    } catch (err) {
+      this.logger.error("Error Getting Student Announcements", { err });
+      throw err;
+
+    } finally {
+      conn.release();
+    }
+  }
+
+  // GET PROFESSOR ANNOUNCEMENTS
+  async getProfessorAnnouncements() {
+    const conn = await this.db.getConnection();
+
+    try {
+      const query = `
+        SELECT *
+        FROM announcements
+        WHERE is_published = 1 
+        AND (target_audience = 'TEACHERS' OR target_audience = 'ALL')
+        ORDER BY announce_id DESC 
+        LIMIT 10
+      `;
+
+      const [rows] = await conn.execute(query);
+      return rows;
+
+    } catch (err) {
+      this.logger.error("Error Getting Professor Announcements", { err });
+      throw err;
+
+    } finally {
+      conn.release();
+    }
+  }
+
+  // DELETE ANNOUNCEMENT
   async deleteAnnouncement(announce_id) {
     const conn = await this.db.getConnection();
 

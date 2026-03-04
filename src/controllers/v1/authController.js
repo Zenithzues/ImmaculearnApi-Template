@@ -73,6 +73,8 @@ export class AuthController {
         email: user[0].email,
         profile_pic: user[0].profile_pic,
         name: user[0].full_name,
+        last_name: user[0].student_ln || user[0].prof_ln,
+        first_name: user[0].student_fn || user[0].prof_fn,
         bd: user[0].birth_date,
         gender: user[0].gender,
         role: payload.role,

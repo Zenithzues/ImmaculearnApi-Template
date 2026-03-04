@@ -178,6 +178,41 @@ class RegisterProfEmailController {
       });
     }
   }
+
+  async deleteEmailAction(req, res) {
+    try {
+      const { email } = req.params;
+      
+      if (!email) {
+        return res.status(400).json({
+          message: "Email parameter is required",
+        });
+      }
+      
+      const result = await this.model.deleteEmail(email);
+      
+      if (!result.deleted) {
+        return res.status(404).json({
+          message: "No records found for this email",
+          email,
+        });
+      }
+      
+      return res.json({
+        message: "All associated records deleted successfully",
+        email,
+        summary: {
+          totalDeleted: result.totalDeleted,
+          breakdown: result.deletedRecords
+        }
+      });
+    } catch (err) {
+      return res.status(500).json({
+        message: "Failed to delete email and associated records",
+        error: err.message,
+      });
+    }
+  }
 }
 
 export default RegisterProfEmailController;

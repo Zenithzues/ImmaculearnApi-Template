@@ -35,4 +35,9 @@ regprofemailRouter.get(
   regprofemail.getAllEmailsAction.bind(regprofemail)
 );
 
+regprofemailRouter.delete(
+  '/delete/:email',
+  regprofemail.deleteEmailAction.bind(regprofemail)
+);
+
 export default regprofemailRouter;

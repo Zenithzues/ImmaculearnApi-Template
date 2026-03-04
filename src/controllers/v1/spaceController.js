@@ -22,6 +22,7 @@ class SpaceController {
       const {
         space_name,
         space_description = "",
+        space_cover,
         space_settings,
       } = req.body || {};
 
@@ -49,6 +50,7 @@ class SpaceController {
         account_id,
         space_name,
         space_description,
+        space_cover,
         settingsValue,
       );
 
@@ -79,6 +81,7 @@ class SpaceController {
       const {
         space_name,
         space_description,
+        space_cover,
         space_day,
         space_time_start,
         space_time_end,
@@ -119,6 +122,7 @@ class SpaceController {
         academic.acad_term_id,
         space_name,
         space_description,
+        space_cover,
         space_day,
         space_time_start,
         space_time_end,
@@ -773,6 +777,7 @@ class SpaceController {
         }/space/j?t=${item.c_space_uuid}`,
         space_name: item.c_space_name,
         space_description: item.c_space_description,
+        space_cover: item.c_space_cover,
         space_day: item.c_space_day,
         space_time_start: item.c_space_time_start,
         space_time_end: item.c_space_time_end,
@@ -820,6 +825,7 @@ class SpaceController {
             : "http://localhost:3000"
         }/space/j?t=${item.space_uuid}`,
         space_name: item.space_name,
+        space_cover: item.space_cover,
         space_description: item.description,
         creator: item.created_by,
         members: item.members.map((member) => ({

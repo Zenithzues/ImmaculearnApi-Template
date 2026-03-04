@@ -72,6 +72,8 @@ server.on("upgrade", (req, socket, head) => {
 /* ================= START SERVER ================= */
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`CLIENT reached with URL ${process.env.CLIENT_URL}`);
+  console.log(
+    `CLIENT reached with URL ${process.env.CLIENT_URL} && http://localhost:5173`,
+  );
   console.log(`🚀 Server running on port ${PORT}`);
 });

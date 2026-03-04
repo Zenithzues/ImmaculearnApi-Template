@@ -7,17 +7,23 @@ class Post {
     this.logger = new Logger("PostModel");
   }
 
-  async createPost(account_id, space_id, post_content) {
+  async createPost(
+    account_id,
+    space_id = null,
+    c_space_id = null,
+    post_content,
+  ) {
     const conn = await this.db.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      const postQuery = `INSERT INTO post(account_id, space_id, post_content, created_at) VALUES(?, ?, ?, NOW())`;
+      const postQuery = `INSERT INTO post(account_id, space_id, c_space_id, post_content, created_at) VALUES(?, ?, ?, ?, NOW())`;
 
       const result = await conn.execute(postQuery, [
         account_id,
         space_id,
+        c_space_id,
         post_content,
       ]);
 
@@ -33,17 +39,24 @@ class Post {
     }
   }
 
-  async createComment(account_id, space_id, post_content, parent_id) {
+  async createComment(
+    account_id,
+    space_id = null,
+    c_space_id = null,
+    post_content,
+    parent_id,
+  ) {
     const conn = await this.db.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      const postQuery = `INSERT INTO post(account_id, space_id, post_content, parent_id, created_at) VALUES(?, ?, ?, ?, NOW())`;
+      const postQuery = `INSERT INTO post(account_id, space_id, c_space_id, post_content, parent_id, created_at) VALUES(?, ?, ?, ?, ?, NOW())`;
 
       const result = await conn.execute(postQuery, [
         account_id,
         space_id,
+        c_space_id,
         post_content,
         parent_id,
       ]);
@@ -64,73 +77,67 @@ class Post {
     }
   }
 
-  async getAllPostBySpaceId(space_id) {
+  async getAllPostBySpaceId(space_id = null, c_space_id = null) {
     try {
+      let spaceIdField;
+      let spaceId;
+
+      // Determine which space ID is provided
+      if (space_id) {
+        // Regular space
+        spaceIdField = "space_id";
+        spaceId = space_id;
+      } else if (c_space_id) {
+        // Course space
+        spaceIdField = "c_space_id";
+        spaceId = c_space_id;
+      } else {
+        // No space ID provided
+        this.logger.error("No space ID provided to getAllPostBySpaceId");
+        return [];
+      }
+
+      this.logger.debug(`Getting posts for ${spaceIdField}: ${spaceId}`);
+
       const result = await this.db.execute(
         `
-           SELECT 
-              p.post_id, 
-              p.account_id, 
-              p.post_content, 
-              COUNT(c.post_id) AS reply_count,
-              p.created_at,
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN 
-                      CONCAT(st.student_fn, ' ', st.student_ln)
-                  WHEN pr.account_id IS NOT NULL THEN 
-                      CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                  ELSE NULL
-              END AS user_full_name,
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN st.student_fn
-                  WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
-                  ELSE NULL
-              END AS first_name,
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN st.student_ln
-                  WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
-                  ELSE NULL
-              END AS last_name,
-              acc.profile_pic
-          FROM post p
-          LEFT JOIN post c ON c.parent_id = p.post_id
-          LEFT JOIN accounts acc ON acc.account_id = p.account_id
-          LEFT JOIN students st ON st.account_id = p.account_id
-          LEFT JOIN professors pr ON pr.account_id = p.account_id
-          WHERE p.space_id = ? AND p.parent_id = 0
-          GROUP BY 
-              p.post_id, 
-              p.account_id, 
-              p.post_content, 
-              p.created_at,
-              -- Use the actual CASE expressions instead of aliases
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN 
-                      CONCAT(st.student_fn, ' ', st.student_ln)
-                  WHEN pr.account_id IS NOT NULL THEN 
-                      CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                  ELSE NULL
-              END,
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN st.student_fn
-                  WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
-                  ELSE NULL
-              END,
-              CASE 
-                  WHEN st.account_id IS NOT NULL THEN st.student_ln
-                  WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
-                  ELSE NULL
-              END,
-              acc.profile_pic
-          ORDER BY p.created_at DESC;
-
-            `,
-        [space_id],
+        SELECT 
+            p.post_id, 
+            p.account_id, 
+            p.post_content, 
+            (SELECT COUNT(*) FROM post c WHERE c.parent_id = p.post_id) AS reply_count,
+            p.created_at,
+            CASE 
+                WHEN st.account_id IS NOT NULL THEN 
+                    CONCAT(st.student_fn, ' ', st.student_ln)
+                WHEN pr.account_id IS NOT NULL THEN 
+                    CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                ELSE NULL
+            END AS user_full_name,
+            CASE 
+                WHEN st.account_id IS NOT NULL THEN st.student_fn
+                WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
+                ELSE NULL
+            END AS first_name,
+            CASE 
+                WHEN st.account_id IS NOT NULL THEN st.student_ln
+                WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
+                ELSE NULL
+            END AS last_name,
+            acc.profile_pic
+        FROM post p
+        LEFT JOIN accounts acc ON acc.account_id = p.account_id
+        LEFT JOIN students st ON st.account_id = p.account_id
+        LEFT JOIN professors pr ON pr.account_id = p.account_id
+        WHERE p.${spaceIdField} = ? AND p.parent_id = 0
+        ORDER BY p.created_at DESC
+        `,
+        [spaceId],
       );
 
       return result;
     } catch (err) {
-      this.logger.error("Error Getting Post", { space_id, err });
+      this.logger.error("Error Getting Posts", { space_id, c_space_id, err });
       throw err;
     }
   }

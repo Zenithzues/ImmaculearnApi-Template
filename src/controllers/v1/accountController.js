@@ -19,7 +19,10 @@ class AccountController {
 
   async oauthGoogleRedirect(req, res) {
     const role = req.query.role;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const redirectUri =
+      process.env.NODE_ENV === "production"
+        ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
+        : process.env.GOOGLE_REDIRECT_URI;
     const clientId = process.env.GOOGLE_CLIENT_ID;
     console.log(redirectUri);
     const scope = ["openid", "email", "profile"].join(" ");
@@ -62,7 +65,10 @@ class AccountController {
           code,
           client_id: process.env.GOOGLE_CLIENT_ID,
           client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+          redirect_uri:
+            process.env.NODE_ENV === "production"
+              ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
+              : process.env.GOOGLE_REDIRECT_URI,
           grant_type: "authorization_code",
         },
         { headers: { "Content-Type": "application/json" } },

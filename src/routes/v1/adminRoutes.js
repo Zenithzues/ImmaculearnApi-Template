@@ -9,20 +9,21 @@ import adminAuth from "../../middlewares/adminAuth.js";
 const adminRouter = new Router();
 const admin = new AdminController();
 
-// Ensure that all endpoints implements authorization
+// Public routes (no authorization required)
+adminRouter.post("/login", admin.login.bind(admin));
+
+// Apply authorization to all subsequent routes
 adminRouter.use(authorization);
 
-adminRouter.post("/login", admin.login.bind(admin));
-adminRouter.post("/create", admin.create.bind(admin));
 adminRouter.get("/refresh", admin.refresh.bind(admin));
-// adminRouter.post("/", admin.create.bind(admin));
-// adminRouter.get("/", authentication, admin.profile.bind(admin));
-// adminRouter.get("/oauth/redirect", authentication, admin.profile.bind(admin));
+adminRouter.get("/profile", admin.profile.bind(admin));
+adminRouter.post("/logout", admin.logout.bind(admin));
+
+adminRouter.post("/create", admin.create.bind(admin));
 
 // adminRouter.use(adminAuth);
 adminRouter.get("/academic/all", admin.get_all_academic.bind(admin));
 adminRouter.post("/academic", admin.create_academic.bind(admin));
 adminRouter.patch("/academic/update", admin.update_academic.bind(admin));
-adminRouter.get("/profile", admin.profile.bind(admin));
 
 export default adminRouter;

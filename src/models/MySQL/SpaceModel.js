@@ -869,69 +869,72 @@ class Space {
             sp.space_name,
             sp.description,
             sp.created_by AS creator,
-            CONCAT('[', COALESCE(
-                (SELECT GROUP_CONCAT(
-                    CONCAT(
-                        '{"account_id":', u.account_id,
-                        ',"email":"', IFNULL(u.email,''),
-                        '","profile_pic":"', IFNULL(u.profile_pic,''),
-                        '","full_name":"', IFNULL(u.full_name,''),
-                        '","birth_date":"', IFNULL(u.birth_date,''),
-                        '","gender":"', IFNULL(u.gender,''),
-                        '","course":"', IFNULL(u.course,''),
-                        '","year_level":"', IFNULL(u.year_level,''),
-                        '","department":"', IFNULL(u.department,''),
-                        '","role":"', u.role,
-                        '"}'
-                    )
-                    SEPARATOR ','
-                )
-                FROM (
-                    -- Get all members (including creator)
-                    SELECT DISTINCT
-                        acc.account_id,
-                        acc.email,
-                        acc.profile_pic,
+
+            CONCAT(
+              '[',
+              GROUP_CONCAT(DISTINCT
+                CONCAT(
+                  '{',
+                    '"account_id":', acc.account_id, ',',
+                    '"email":"', IFNULL(acc.email,''), '",',
+                    '"profile_pic":"', IFNULL(acc.profile_pic,''), '",',
+                    '"full_name":"', IFNULL(
                         COALESCE(
-                            CONCAT(st.student_fn, ' ', st.student_ln),
-                            CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                        ) AS full_name,
-                        COALESCE(st.student_bd, pr.prof_bd) AS birth_date,
-                        COALESCE(st.student_gender, pr.prof_gender) AS gender,
-                        st.student_course AS course,
-                        st.student_yr_lvl AS year_level,
-                        pr.prof_department AS department,
-                        CASE 
-                            WHEN acc.account_id = sp.created_by THEN 'creator'
-                            WHEN st.account_id IS NOT NULL THEN 'student'
-                            ELSE 'professor'
-                        END AS role
-                    FROM accounts acc
-                    LEFT JOIN students st ON acc.account_id = st.account_id
-                    LEFT JOIN professors pr ON acc.account_id = pr.account_id
-                    WHERE acc.account_id = sp.created_by
-                      OR acc.account_id IN (
-                          SELECT account_id 
-                          FROM space_members 
-                          WHERE space_id = sp.space_id 
-                            AND status = 'accepted'
-                      )
-                ) u), '[]'
-            ), ']') AS members
+                          CONCAT(st.student_fn,' ',st.student_ln), 
+                          CONCAT(pr.prof_fn,' ',pr.prof_ln)
+                        ), ''
+                    ), '",',
+                    '"birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd), ''), '",',
+                    '"gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender), ''), '",',
+                    '"course":"', IFNULL(st.student_course, ''), '",',
+                    '"year_level":"', IFNULL(st.student_yr_lvl, ''), '",',
+                    '"department":"', IFNULL(pr.prof_department, ''), '",',
+                    '"role":"',
+                      CASE 
+                        WHEN acc.account_id = sp.created_by THEN 'creator'
+                        WHEN st.account_id IS NOT NULL THEN 'student'
+                        ELSE 'professor'
+                      END,
+                    '"',
+                  '}'
+                )
+              ),
+              ']'
+            ) AS members
 
         FROM spaces sp
-        WHERE sp.space_type = 'normal' 
-          AND (sp.created_by = ? OR EXISTS (
-                SELECT 1 FROM space_members sm 
-                WHERE sm.space_id = sp.space_id AND sm.account_id = ? AND sm.status = 'accepted'
-              ))
-        GROUP BY 
-            sp.space_id,
-            sp.space_uuid,
-            sp.space_name,
-            sp.description,
-            sp.created_by
-        ORDER BY sp.created_at DESC; -- Optional: add ordering
+
+        /* Join accepted members */
+        LEFT JOIN space_members spm 
+          ON sp.space_id = spm.space_id 
+          AND spm.status = 'accepted'
+
+        /* Join accounts (members + creator) */
+        LEFT JOIN accounts acc 
+          ON acc.account_id = spm.account_id 
+          OR acc.account_id = sp.created_by
+
+        LEFT JOIN students st 
+          ON acc.account_id = st.account_id
+
+        LEFT JOIN professors pr 
+          ON acc.account_id = pr.account_id
+
+        WHERE sp.space_type = 'normal'
+          AND (
+              sp.created_by = ?
+              OR EXISTS (
+                  SELECT 1 
+                  FROM space_members sm 
+                  WHERE sm.space_id = sp.space_id 
+                    AND sm.account_id = ?
+                    AND sm.status = 'accepted'
+              )
+          )
+
+        /* Primary key grouping (clean & safe) */
+        GROUP BY sp.space_id
+
         `,
         [account_id, account_id],
       );
@@ -1617,6 +1620,10 @@ class Space {
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
             csp.created_by,
+            CONCAT(
+              '{"name":"', creator_prof.prof_fn, ' ', creator_prof.prof_ln,
+              '","avatar":"', IFNULL(creator_acc.profile_pic, ''), '"}'
+            ) AS professor,
             CONCAT('[', 
                 GROUP_CONCAT(
                     CONCAT(
@@ -1652,12 +1659,15 @@ class Space {
             ON csp.c_space_id = spm.c_space_id 
             AND spm.status = 'accepted'
         LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id 
-            OR acc.account_id = csp.created_by
+            ON acc.account_id = spm.account_id
         LEFT JOIN students st
             ON acc.account_id = st.account_id
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
+        LEFT JOIN professors creator_prof
+            ON creator_prof.account_id = csp.created_by
+        LEFT JOIN accounts creator_acc
+            ON creator_acc.account_id = csp.created_by
         LEFT JOIN academic_term at
             ON csp.acad_term_id = at.acad_term_id
         WHERE csp.is_archive = 1 AND EXISTS (

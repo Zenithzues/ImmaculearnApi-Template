@@ -454,12 +454,20 @@ class AccountController {
         maxAge: 15 * 60 * 1000,
       });
 
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({
+          refreshToken,
+          role: user.role,
+        }),
+
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        },
+      );
 
       return res.status(200).json({
         success: true,

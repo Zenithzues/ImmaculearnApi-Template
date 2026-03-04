@@ -4,7 +4,7 @@ import { generateAccessToken } from "../../utils/tokens.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 // import User from '../../models/MySQL/UserModel.js';
 import { Logger } from "../../utils/Logger.js";
-// import { hybridDatabase } from "../../core/HybridDatabase.js";
+import { hybridDatabase } from "../../core/HybridDatabase.js";
 import { Validator } from "../../utils/Validator.js";
 import User from "../../models/MySQL/UserModel.js";
 
@@ -63,17 +63,16 @@ export class AuthController {
       const result = await this.user.getUserStatus(payload.userId);
 
       // Sync user to Supabase for collaboration features
-      // await hybridDatabase.syncUserToSupabase(
-      //   payload.userId.toString(),
-      //   payload.role,
-      // );
+      await hybridDatabase.syncUserToSupabase(
+        payload.userId.toString(),
+        payload.role,
+      );
 
       const profileData = {
         id: user[0].account_id,
         email: user[0].email,
         profile_pic: user[0].profile_pic,
-        last_name: user[0].student_ln || user[0].prof_ln,
-        first_name: user[0].student_fn || user[0].prof_fn,
+        name: user[0].full_name,
         bd: user[0].birth_date,
         gender: user[0].gender,
         role: payload.role,
@@ -154,7 +153,7 @@ export class AuthController {
       await this.user.updateUserStatus(user.account_id, "online");
 
       // 5. Sync user to Supabase
-      // await hybridDatabase.syncUserToSupabase(user.account_id.toString());
+      await hybridDatabase.syncUserToSupabase(user.account_id.toString());
 
       // 6. Generate tokens
       const accessToken = generateAccessToken(user.account_id, emailCheck.role);
@@ -173,14 +172,14 @@ export class AuthController {
       }
 
       // 8. Set cookies
-      // res.cookie("accessToken", accessToken, {
-      //   httpOnly: true,
-      //   secure: process.env.NODE_ENV === "production",
-      //   sameSite: "Strict",
-      //   //sameSite: "None",
-      //   //sameSite: "None",
-      //   maxAge: 15 * 60 * 1000, // 15 minutes
-      // });
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Strict",
+        //sameSite: "None",
+        //sameSite: "None",
+        maxAge: 15 * 60 * 1000, // 15 minutes
+      });
 
       res.cookie(
         "refreshToken",
@@ -208,12 +207,11 @@ export class AuthController {
       res.json({
         success: true,
         message: "Login successful",
-        accessToken,
-        // data: {
-        //   account_id: user.account_id,
-        //   email: user.email,
-        //   role: emailCheck.role,
-        // },
+        data: {
+          account_id: user.account_id,
+          email: user.email,
+          role: emailCheck.role,
+        },
       });
     } catch (err) {
       this.logger.logError(err, {
@@ -315,7 +313,6 @@ export class AuthController {
       res.json({
         success: true,
         message: "Token refreshed successfully",
-        accessToken: newAccessToken,
       });
     } catch (err) {
       this.logger.error("Refresh error", { error: err.message });
@@ -480,7 +477,7 @@ export class AuthController {
       const accountId = result.insertId;
 
       // 5. Sync user to Supabase
-      // await hybridDatabase.syncUserToSupabase(accountId.toString());
+      await hybridDatabase.syncUserToSupabase(accountId.toString());
 
       // 6. Generate tokens
       const accessToken = generateAccessToken(accountId, emailCheck.role);
@@ -497,7 +494,7 @@ export class AuthController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         //sameSite: "None",
         //sameSite: "None",
         maxAge: 15 * 60 * 1000,
@@ -512,9 +509,7 @@ export class AuthController {
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
-          //sameSite: "None",
-          //sameSite: "None",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 30 * 24 * 60 * 60 * 1000,
         },
       );

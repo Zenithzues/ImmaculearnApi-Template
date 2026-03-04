@@ -203,47 +203,60 @@ class Task {
 
       const sql = `
       SELECT 
-        t.task_id,
-        COALESCE(t.space_id, t.c_space_id) AS space_id,
-        t.task_category,
-        t.task_title,
-        t.task_instruction,
-        t.lesson_id,
-        t.total_score,
-        t.due_date,
-        t.created_at,
-        t.updated_at,
+          t.task_id,
+          COALESCE(t.space_id, t.c_space_id) AS space_id,
+          t.task_category,
+          t.task_title,
+          t.task_instruction,
+          t.lesson_id,
+          t.total_score,
+          t.due_date,
+          t.created_at,
+          t.updated_at,
 
-        COUNT(q.question_id) AS question_count,
+          COUNT(q.question_id) AS question_count,
 
-        ts.account_id,
-        ts.score,
-        ts.max_score,
+          -- Use MAX or MIN for these since they come from non-grouped columns
+          MAX(ts.account_id) AS account_id,
+          MAX(ts.score) AS score,
+          MAX(ts.max_score) AS max_score,
 
-        CASE
-          WHEN COUNT(ta.answer_id) > 0 THEN 1
-          ELSE 0
-        END AS has_answered
+          CASE
+              WHEN COUNT(ta.answer_id) > 0 THEN 1
+              ELSE 0
+          END AS has_answered
 
       FROM tasks t
       LEFT JOIN task_questions q
-        ON q.task_id = t.task_id
+          ON q.task_id = t.task_id
 
       -- check if this student answered
       LEFT JOIN task_answers ta
-        ON ta.task_id = t.task_id
-       AND ta.account_id = ?
+          ON ta.task_id = t.task_id
+          AND ta.account_id = ?
 
       -- final score if submitted
       LEFT JOIN task_score ts
-        ON ts.task_id = t.task_id
-       AND ts.account_id = ?
+          ON ts.task_id = t.task_id
+          AND ts.account_id = ?
 
       WHERE ${whereClauses.join(" OR ")}
 
-      GROUP BY t.task_id
+      GROUP BY 
+          t.task_id,
+          t.task_category,
+          t.task_title,
+          t.task_instruction,
+          t.lesson_id,
+          t.total_score,
+          t.due_date,
+          t.created_at,
+          t.updated_at,
+          -- Add COALESCE expression to GROUP BY
+          COALESCE(t.space_id, t.c_space_id)
+
       ORDER BY t.created_at DESC
-    `;
+      `;
 
       const params = [
         account_id ?? null,

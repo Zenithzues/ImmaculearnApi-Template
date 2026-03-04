@@ -869,40 +869,69 @@ class Space {
             sp.space_name,
             sp.description,
             sp.created_by AS creator,
-            CONCAT('[', GROUP_CONCAT(
-                CONCAT(
-                    '{"account_id":', acc.account_id,
-                    ',"email":"', IFNULL(acc.email,''),
-                    '","profile_pic":"', IFNULL(acc.profile_pic,''),
-                    '","full_name":"', IFNULL(COALESCE(CONCAT(st.student_fn,' ',st.student_ln), CONCAT(pr.prof_fn,' ',pr.prof_ln)),''),
-                    '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd),''),
-                    '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender),''),
-                    '","course":"', IFNULL(st.student_course,''),
-                    '","year_level":"', IFNULL(st.student_yr_lvl,''),
-                    '","department":"', IFNULL(pr.prof_department,''),
-                    '","role":"', CASE 
-                        WHEN acc.account_id = sp.created_by THEN 'creator'
-                        WHEN st.account_id IS NOT NULL THEN 'student'
-                        ELSE 'professor'
-                    END,
-                    '"}'
+            CONCAT('[', COALESCE(
+                (SELECT GROUP_CONCAT(
+                    CONCAT(
+                        '{"account_id":', u.account_id,
+                        ',"email":"', IFNULL(u.email,''),
+                        '","profile_pic":"', IFNULL(u.profile_pic,''),
+                        '","full_name":"', IFNULL(u.full_name,''),
+                        '","birth_date":"', IFNULL(u.birth_date,''),
+                        '","gender":"', IFNULL(u.gender,''),
+                        '","course":"', IFNULL(u.course,''),
+                        '","year_level":"', IFNULL(u.year_level,''),
+                        '","department":"', IFNULL(u.department,''),
+                        '","role":"', u.role,
+                        '"}'
+                    )
+                    SEPARATOR ','
                 )
+                FROM (
+                    -- Get all members (including creator)
+                    SELECT DISTINCT
+                        acc.account_id,
+                        acc.email,
+                        acc.profile_pic,
+                        COALESCE(
+                            CONCAT(st.student_fn, ' ', st.student_ln),
+                            CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                        ) AS full_name,
+                        COALESCE(st.student_bd, pr.prof_bd) AS birth_date,
+                        COALESCE(st.student_gender, pr.prof_gender) AS gender,
+                        st.student_course AS course,
+                        st.student_yr_lvl AS year_level,
+                        pr.prof_department AS department,
+                        CASE 
+                            WHEN acc.account_id = sp.created_by THEN 'creator'
+                            WHEN st.account_id IS NOT NULL THEN 'student'
+                            ELSE 'professor'
+                        END AS role
+                    FROM accounts acc
+                    LEFT JOIN students st ON acc.account_id = st.account_id
+                    LEFT JOIN professors pr ON acc.account_id = pr.account_id
+                    WHERE acc.account_id = sp.created_by
+                      OR acc.account_id IN (
+                          SELECT account_id 
+                          FROM space_members 
+                          WHERE space_id = sp.space_id 
+                            AND status = 'accepted'
+                      )
+                ) u), '[]'
             ), ']') AS members
+
         FROM spaces sp
-        LEFT JOIN space_members spm
-            ON sp.space_id = spm.space_id AND spm.status = 'accepted' 
-        LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id OR acc.account_id = sp.created_by
-        LEFT JOIN students st
-            ON acc.account_id = st.account_id
-        LEFT JOIN professors pr
-            ON acc.account_id = pr.account_id
         WHERE sp.space_type = 'normal' 
           AND (sp.created_by = ? OR EXISTS (
                 SELECT 1 FROM space_members sm 
-                WHERE sm.space_id = sp.space_id AND sm.account_id = ?
+                WHERE sm.space_id = sp.space_id AND sm.account_id = ? AND sm.status = 'accepted'
               ))
-        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
+        GROUP BY 
+            sp.space_id,
+            sp.space_uuid,
+            sp.space_name,
+            sp.description,
+            sp.created_by
+        ORDER BY sp.created_at DESC; -- Optional: add ordering
         `,
         [account_id, account_id],
       );

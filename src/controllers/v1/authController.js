@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { generateAccessToken } from "../../utils/tokens.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "../../utils/tokens.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 // import User from '../../models/MySQL/UserModel.js';
 import { Logger } from "../../utils/Logger.js";
@@ -297,18 +300,43 @@ export class AuthController {
         role,
       );
 
+      const newRefreshToken = generateRefreshToken();
+
+      const newHashedRefresh = crypto
+        .createHash("sha256")
+        .update(newRefreshToken)
+        .digest("hex");
+
       // Update user status
       await this.user.updateUserStatus(userTokenRecord.account_id, "online");
 
+      await this.userTokenModel.update(
+        userTokenRecord?.account_id,
+        newHashedRefresh,
+      );
+
       // Set new access token cookie
       res.cookie("accessToken", newAccessToken, {
-        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: "Strict",
-        //sameSite: "None",
-        //sameSite: "None",
-        maxAge: 15 * 60 * 1000, // 15 minutes
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        maxAge: 15 * 60 * 1000,
       });
+
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({
+          newRefreshToken,
+          role: role,
+        }),
+
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        },
+      );
 
       // this.logger.debug('Token refreshed', { account_id: userTokenRecord.account_id });
 

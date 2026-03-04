@@ -1011,17 +1011,20 @@ class Space {
                     AND sm2.status = 'accepted'
                 )
             )
-        GROUP BY 
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.created_by,
-            at.acad_term_name,
-            at.semester
+        GROUP BY
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.created_by,
+          at.acad_term_name,
+          at.semester,
+          creator_prof.prof_fn,
+          creator_prof.prof_ln,
+          creator_acc.profile_pic
         ORDER BY csp.created_at DESC;
         `,
         [account_id, account_id],
@@ -1652,17 +1655,20 @@ class Space {
                     AND sm2.status = 'accepted'
                 )
             )
-        GROUP BY 
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.created_by,
-            at.acad_term_name,
-            at.semester
+        GROUP BY
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.created_by,
+          at.acad_term_name,
+          at.semester,
+          creator_prof.prof_fn,
+          creator_prof.prof_ln,
+          creator_acc.profile_pic
         ORDER BY csp.created_at DESC;
         `,
         [account_id, account_id],

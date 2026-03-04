@@ -1019,7 +1019,7 @@ class Space {
             csp.c_space_time_start,
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
-            csp.created_by
+            csp.created_by,
             at.acad_term_name,
             at.semester
         ORDER BY csp.created_at DESC;
@@ -1660,7 +1660,7 @@ class Space {
             csp.c_space_time_start,
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
-            csp.created_by
+            csp.created_by,
             at.acad_term_name,
             at.semester
         ORDER BY csp.created_at DESC;

@@ -28,11 +28,15 @@ app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"];
+
 app.use(
   "/v1",
   cors({
-    // origin: process.env.CLIENT_URL || "https://immaculearn-web.netlify.app",
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, cb) =>
+      !origin || allowedOrigins.includes(origin)
+        ? cb(null, true)
+        : cb(new Error("Not allowed by CORS")),
     credentials: true,
   }),
   v1,

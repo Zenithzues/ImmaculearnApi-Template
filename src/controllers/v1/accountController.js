@@ -47,7 +47,9 @@ class AccountController {
 
       if (!code)
         return res.redirect(
-          "http://localhost:5173/oauth/callback?error=oauth_failed",
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
+            : `http://localhost:5173/oauth/callback?error=oauth_failed`,
         );
 
       // Decode role from state
@@ -87,7 +89,9 @@ class AccountController {
 
       if (!result)
         return res.redirect(
-          "http://localhost:5173/oauth/callback?error=not_registered",
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?error=not_registered`
+            : "http://localhost:5173/oauth/callback?error=not_registered",
         );
 
       const { user, role, tempToken, needsOnboarding } = result;
@@ -97,7 +101,9 @@ class AccountController {
       if (needsOnboarding) {
         // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
         return res.redirect(
-          `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
 
         // New user → redirect to onboarding page with tempToken
@@ -142,18 +148,20 @@ class AccountController {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 15 * 60 * 1000, // 15 minutes
         });
 
         res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
-          `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
       }
 
@@ -164,7 +172,9 @@ class AccountController {
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
-        "http://localhost:5173/oauth/callback?error=oauth_failed",
+        process.env.NODE_ENV === "production"
+          ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
+          : "http://localhost:5173/oauth/callback?error=oauth_failed",
       );
     }
   }
@@ -253,7 +263,10 @@ class AccountController {
         success: true,
         data: {
           space: {
-            space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
+            space_link:
+              process.env.NODE_ENV === "production"
+                ? `${process.env.CLIENT_URL}/space/${result.space_uuid}`
+                : `immaculearn.collab.app/space/${result.space_uuid}`,
             space_name: result.space_name,
             space_description: result.description,
           },
@@ -431,15 +444,15 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
       return res.status(200).json({
@@ -585,15 +598,15 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
       });
 
       // Send success response

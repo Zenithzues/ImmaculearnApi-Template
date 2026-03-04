@@ -69,45 +69,60 @@ class Post {
       const result = await this.db.execute(
         `
            SELECT 
-                p.post_id, 
-                p.account_id, 
-                p.post_content, 
-                COUNT(c.post_id) AS reply_count,
-                p.created_at,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN 
-                        CONCAT(st.student_fn, ' ', st.student_ln)
-                    WHEN pr.account_id IS NOT NULL THEN 
-                        CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                    ELSE NULL
-                END AS user_full_name,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN st.student_fn
-                    WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
-                    ELSE NULL
-                END AS first_name,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN st.student_ln
-                    WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
-                    ELSE NULL
-                END AS last_name,
-                acc.profile_pic
-            FROM post p
-            LEFT JOIN post c ON c.parent_id = p.post_id
-            LEFT JOIN accounts acc ON acc.account_id = p.account_id
-            LEFT JOIN students st ON st.account_id = p.account_id
-            LEFT JOIN professors pr ON pr.account_id = p.account_id
-            WHERE p.space_id = ? AND p.parent_id = 0
-            GROUP BY 
-                p.post_id, 
-                p.account_id, 
-                p.post_content, 
-                p.created_at,
-                user_full_name,
-                first_name,
-                last_name,
-                acc.profile_pic
-            ORDER BY p.created_at DESC;
+              p.post_id, 
+              p.account_id, 
+              p.post_content, 
+              COUNT(c.post_id) AS reply_count,
+              p.created_at,
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN 
+                      CONCAT(st.student_fn, ' ', st.student_ln)
+                  WHEN pr.account_id IS NOT NULL THEN 
+                      CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                  ELSE NULL
+              END AS user_full_name,
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN st.student_fn
+                  WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
+                  ELSE NULL
+              END AS first_name,
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN st.student_ln
+                  WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
+                  ELSE NULL
+              END AS last_name,
+              acc.profile_pic
+          FROM post p
+          LEFT JOIN post c ON c.parent_id = p.post_id
+          LEFT JOIN accounts acc ON acc.account_id = p.account_id
+          LEFT JOIN students st ON st.account_id = p.account_id
+          LEFT JOIN professors pr ON pr.account_id = p.account_id
+          WHERE p.space_id = ? AND p.parent_id = 0
+          GROUP BY 
+              p.post_id, 
+              p.account_id, 
+              p.post_content, 
+              p.created_at,
+              -- Use the actual CASE expressions instead of aliases
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN 
+                      CONCAT(st.student_fn, ' ', st.student_ln)
+                  WHEN pr.account_id IS NOT NULL THEN 
+                      CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                  ELSE NULL
+              END,
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN st.student_fn
+                  WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
+                  ELSE NULL
+              END,
+              CASE 
+                  WHEN st.account_id IS NOT NULL THEN st.student_ln
+                  WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
+                  ELSE NULL
+              END,
+              acc.profile_pic
+          ORDER BY p.created_at DESC;
 
             `,
         [space_id],
@@ -126,45 +141,47 @@ class Post {
       const result = await this.db.execute(
         `
            SELECT 
-                p.post_id, 
-                p.account_id, 
-                p.post_content, 
-                COUNT(c.post_id) AS reply_count,
-                p.created_at,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN 
-                        CONCAT(st.student_fn, ' ', st.student_ln)
-                    WHEN pr.account_id IS NOT NULL THEN 
-                        CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                    ELSE NULL
-                END AS user_full_name,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN st.student_fn
-                    WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
-                    ELSE NULL
-                END AS student_fn,
-                CASE 
-                    WHEN st.account_id IS NOT NULL THEN st.student_ln
-                    WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
-                    ELSE NULL
-                END AS ln,
-                acc.profile_pic
-            FROM post p
-            LEFT JOIN post c ON c.parent_id = p.post_id
-            LEFT JOIN accounts acc ON acc.account_id = p.account_id
-            LEFT JOIN students st ON st.account_id = p.account_id
-            LEFT JOIN professors pr ON pr.account_id = p.account_id
-            WHERE p.parent_id = ?
-            GROUP BY 
-                p.post_id, 
-                p.account_id, 
-                p.post_content, 
-                p.created_at,
-                user_full_name,
-                student_fn,
-                ln,
-                acc.profile_pic
-            ORDER BY p.created_at ASC;
+              p.post_id, 
+              p.account_id, 
+              p.post_content, 
+              p.reply_count,
+              p.created_at,
+              p.user_full_name,
+              p.student_fn,
+              p.ln,
+              p.profile_pic
+          FROM (
+              SELECT 
+                  p.post_id, 
+                  p.account_id, 
+                  p.post_content, 
+                  (SELECT COUNT(*) FROM post c WHERE c.parent_id = p.post_id) AS reply_count,
+                  p.created_at,
+                  CASE 
+                      WHEN st.account_id IS NOT NULL THEN 
+                          CONCAT(st.student_fn, ' ', st.student_ln)
+                      WHEN pr.account_id IS NOT NULL THEN 
+                          CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                      ELSE NULL
+                  END AS user_full_name,
+                  CASE 
+                      WHEN st.account_id IS NOT NULL THEN st.student_fn
+                      WHEN pr.account_id IS NOT NULL THEN pr.prof_fn
+                      ELSE NULL
+                  END AS student_fn,
+                  CASE 
+                      WHEN st.account_id IS NOT NULL THEN st.student_ln
+                      WHEN pr.account_id IS NOT NULL THEN pr.prof_ln
+                      ELSE NULL
+                  END AS ln,
+                  acc.profile_pic
+              FROM post p
+              LEFT JOIN accounts acc ON acc.account_id = p.account_id
+              LEFT JOIN students st ON st.account_id = p.account_id
+              LEFT JOIN professors pr ON pr.account_id = p.account_id
+              WHERE p.parent_id = ?
+          ) p
+          ORDER BY p.created_at ASC;
 
             `,
         [parent_id],

@@ -606,6 +606,12 @@ class SpaceController {
           .status(401)
           .json({ success: false, message: "Email not Verified" });
 
+      if (isVerified.role === "professor")
+        return res.status(400).json({
+          success: false,
+          message: "You can't invite Professor in Space.",
+        });
+
       // console.log(verifiedEmail);
 
       // Only owner can invite

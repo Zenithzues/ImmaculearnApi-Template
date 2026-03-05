@@ -183,7 +183,7 @@ class PostController {
   async get_all_comment_by_post_id(req, res) {
     try {
       const account_id = res.locals.account_id;
-      const post_id = req.params.post_id || 0;
+      const post_id = req.params.post_id;
 
       if (!account_id)
         return res

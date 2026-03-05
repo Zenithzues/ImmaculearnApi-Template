@@ -414,7 +414,7 @@ export class AuthController {
       this.logger.error("Logout failed", { error: err.message });
       res.status(500).json({
         success: false,
-        message: "Logout failed",
+        message: "Logout failed.",
       });
     }
   }

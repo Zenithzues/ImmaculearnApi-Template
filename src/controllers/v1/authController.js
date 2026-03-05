@@ -396,16 +396,14 @@ export class AuthController {
       // Clear cookies
       res.clearCookie("accessToken", {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
       });
 
       res.clearCookie("refreshToken", {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
       });
 
       res.json({

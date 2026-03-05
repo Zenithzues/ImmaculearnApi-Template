@@ -97,14 +97,14 @@ class AdminController {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 15 * 60 * 1000,
         });
   
-        res.cookie("refreshToken", refreshToken, {
+        res.cookie("refreshToken", JSON.stringify({ refreshToken: refreshToken, role: "Admin" }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
   
@@ -112,6 +112,7 @@ class AdminController {
           success: true,
           message: "Welcome Back Admin!",
           accessToken: accessToken,
+          role: "Admin",
         });
       } catch (err) {
         console.error("Login error:", err);
@@ -234,26 +235,24 @@ class AdminController {
       try {
         let cookieVal = req.cookies.refreshToken;
       
-      // Handle both JSON string and plain string formats
-      if (cookieVal) {
-        try {
-          cookieVal = JSON.parse(cookieVal);
-        } catch (e) {
-          // If parsing fails, treat as plain string with no role
-          cookieVal = { refreshToken: cookieVal, role: null };
+        // Handle both JSON string and plain string formats
+        if (cookieVal) {
+          try {
+            cookieVal = JSON.parse(cookieVal);
+          } catch (e) {
+            // If parsing fails, treat as plain string with no role
+            cookieVal = { refreshToken: cookieVal, role: null };
+          }
         }
-      }
       
-      if (!cookieVal) {
-        return res.status(401).json({
-          success: false,
-          message: "No Token Found",
-        });
-      }
+        if (!cookieVal) {
+          return res.status(401).json({
+            success: false,
+            message: "No Token Found",
+          });
+        }
 
-      // console.log(cookieVal);
-      const { refreshToken, role } = cookieVal;
-  
+        const { refreshToken, role } = cookieVal;
         
         if (!refreshToken) {
           return res.status(401).json({
@@ -283,7 +282,6 @@ class AdminController {
         // Check if refresh token is expired
         if (new Date(userTokenRecord.expires_at) < new Date()) {
           await this.userTokenModel.invalidate(userTokenRecord.token_id);
-          // this.logger.warn('Refresh token expired', { token_id: userTokenRecord.token_id });
           return res.status(401).json({
             success: false,
             message: "Refresh token expired",
@@ -293,20 +291,31 @@ class AdminController {
         // Generate new access token
         const newAccessToken = generateAdminAccessToken(userTokenRecord.admin_id);
   
-        // Admin doesn't need user status update
-        // await this.user.updateUserStatus(userTokenRecord.account_id, "online");
+        // Generate new refresh token
+        const newRefreshToken = generateRefreshToken();
+        const newHashedRefresh = crypto
+          .createHash("sha256")
+          .update(newRefreshToken)
+          .digest("hex");
+  
+        // Update refresh token in database
+        await this.userTokenModel.adminUpdate(userTokenRecord.admin_id, newHashedRefresh);
   
         // Set new access token cookie
         res.cookie("accessToken", newAccessToken, {
           secure: process.env.NODE_ENV === "production",
           httpOnly: true,
-          sameSite: "Strict",
-          //sameSite: "None",
-          //sameSite: "None",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 15 * 60 * 1000, // 15 minutes
         });
   
-        // this.logger.debug('Token refreshed', { account_id: userTokenRecord.account_id });
+        // Set new refresh token cookie as JSON
+        res.cookie("refreshToken", JSON.stringify({ refreshToken: newRefreshToken, role: "Admin" }), {
+          secure: process.env.NODE_ENV === "production",
+          httpOnly: true,
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
   
         res.json({
           success: true,

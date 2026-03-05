@@ -12,12 +12,13 @@ const admin = new AdminController();
 // Public routes (no authorization required)
 adminRouter.post("/login", admin.login.bind(admin));
 
-// Apply authorization to all subsequent routes
-adminRouter.use(authorization);
-
+// Apply JWT authentication to protected routes
 adminRouter.get("/refresh", admin.refresh.bind(admin));
 adminRouter.get("/profile", admin.profile.bind(admin));
 adminRouter.post("/logout", admin.logout.bind(admin));
+
+// Apply authorization to admin management routes
+adminRouter.use(authorization);
 
 adminRouter.post("/create", admin.create.bind(admin));
 

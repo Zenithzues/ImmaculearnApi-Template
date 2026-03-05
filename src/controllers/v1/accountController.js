@@ -102,7 +102,7 @@ class AccountController {
 
       const { user, role, tempToken, needsOnboarding } = result;
 
-      console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
+      console.log("NEEEDSSS ON BOARDING", needsOnboarding);
 
       if (needsOnboarding) {
         // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)

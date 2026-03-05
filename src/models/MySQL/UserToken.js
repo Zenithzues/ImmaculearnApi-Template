@@ -147,17 +147,14 @@ export class UserToken {
 
   async findByRefresh(refreshToken) {
     try {
-      console.log("Looking for refresh token:", refreshToken);
-
       // Ensure database is connected
       await this.db.ensureConnected();
 
       const query = `SELECT * FROM tokens WHERE refresh_token = ?`;
-      const [rows] = await this.db.execute(query, [refreshToken]);
+      const result = await this.db.execute(query, [refreshToken]);
+      const rows = result[0] || result; // Handle different MySQL driver formats
 
-      console.log("Found rows:", rows);
-
-      return rows || null;
+      return Array.isArray(rows) ? rows[0] : rows;
     } catch (error) {
       this.logger.error("Error finding token by refresh token", { error });
       throw error;

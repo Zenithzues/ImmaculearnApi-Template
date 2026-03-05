@@ -8,6 +8,18 @@ const announcementController = new AnnouncementController();
 // Create a new announcement
 router.post("/create", announcementController.create_announcement.bind(announcementController));
 
+// Get student announcements - accessible to students
+router.get("/students", announcementController.get_student_announcements.bind(announcementController));
+
+// Get professor announcements - accessible to professors
+router.get("/professor", announcementController.get_professor_announcements.bind(announcementController));
+
+// Get professor announcements - accessible to professors (plural version)
+router.get("/professors", announcementController.get_professor_announcements.bind(announcementController));
+
+// Get all announcements - accessible to both students and professors (ALL target audience)
+router.get("/all", announcementController.get_announcements.bind(announcementController));
+
 // Get all announcements with optional filtering
 router.get("/", announcementController.get_announcements.bind(announcementController));
 

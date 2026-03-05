@@ -84,6 +84,72 @@ class RegisteredProfEmail {
   const [rows] = await this.db.execute(sql);
   return rows;
 }
+
+  async deleteEmail(email) {
+    const connection = await this.db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // Get account_id from accounts table using email
+      const [accountRows] = await connection.execute(
+        'SELECT account_id FROM accounts WHERE email = ?',
+        [email]
+      );
+      
+      let deletedRecords = {
+        registeredEmails: 0,
+        accounts: 0,
+        professors: 0
+      };
+      
+      if (accountRows.length > 0) {
+        const accountId = accountRows[0].account_id;
+        
+        // Delete from professors table where account_id matches
+        const [professorResult] = await connection.execute(
+          'DELETE FROM professors WHERE account_id = ?',
+          [accountId]
+        );
+        deletedRecords.professors = professorResult.affectedRows;
+        
+        // Delete from accounts table
+        const [accountResult] = await connection.execute(
+          'DELETE FROM accounts WHERE account_id = ?',
+          [accountId]
+        );
+        deletedRecords.accounts = accountResult.affectedRows;
+      }
+      
+      // Delete from registered_prof_emails table
+      const [emailResult] = await connection.execute(
+        'DELETE FROM registered_prof_emails WHERE email = ?',
+        [email]
+      );
+      deletedRecords.registeredEmails = emailResult.affectedRows;
+      
+      await connection.commit();
+      
+      const totalDeleted = deletedRecords.registeredEmails + deletedRecords.accounts + deletedRecords.professors;
+      
+      return {
+        deleted: totalDeleted > 0,
+        email,
+        deletedRecords,
+        totalDeleted,
+        message:
+          totalDeleted > 0
+            ? `Successfully deleted ${totalDeleted} records associated with ${email}`
+            : "No records found for this email",
+      };
+      
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 export default RegisteredProfEmail;

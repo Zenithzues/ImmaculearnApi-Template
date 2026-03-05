@@ -12,7 +12,7 @@ class AdminModel {
     try {
       const admin = await this.db.execute(
         `
-          SELECT admin_fullname, admin_email FROM admin_account
+          SELECT admin_id, admin_fullname, admin_email FROM admin_account
           WHERE admin_id = ?
         `,
         [admin_id],

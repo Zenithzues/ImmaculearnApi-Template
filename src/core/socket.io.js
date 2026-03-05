@@ -1,18 +1,21 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import crypto from 'crypto';
-import Message from '../models/Supabase/Message.js';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
+import Message from "../models/Supabase/Message.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.resolve(__dirname, '../data');
-const FILE_PATH = path.join(DATA_DIR, 'onlineUsers.json');
+const DATA_DIR = path.resolve(__dirname, "../data");
+const FILE_PATH = path.join(DATA_DIR, "onlineUsers.json");
 
-if (!fs.existsSync(FILE_PATH) || fs.readFileSync(FILE_PATH, 'utf8').trim() === '') {
+if (
+  !fs.existsSync(FILE_PATH) ||
+  fs.readFileSync(FILE_PATH, "utf8").trim() === ""
+) {
   ensureDataDir();
-  fs.writeFileSync(FILE_PATH, '{}', 'utf8');
+  fs.writeFileSync(FILE_PATH, "{}", "utf8");
 }
 
 const onlineUsers = new Map();
@@ -41,21 +44,21 @@ function serializeOnlineUsers() {
 export function saveOnlineUsersToFile() {
   ensureDataDir();
   const data = JSON.stringify(serializeOnlineUsers(), null, 2);
-  fs.writeFileSync(FILE_PATH, data, 'utf8');
-  console.log('Saved online users to onlineUsers.json');
+  fs.writeFileSync(FILE_PATH, data, "utf8");
+  console.log("Saved online users to onlineUsers.json");
 }
 
 export function loadOnlineUsersFromFile() {
   if (!fs.existsSync(FILE_PATH)) return;
 
-  const raw = fs.readFileSync(FILE_PATH, 'utf8').trim();
+  const raw = fs.readFileSync(FILE_PATH, "utf8").trim();
   if (!raw) return;
 
   let obj;
   try {
     obj = JSON.parse(raw);
   } catch (err) {
-    console.error('Failed to parse onlineUsers.json:', err);
+    console.error("Failed to parse onlineUsers.json:", err);
     return;
   }
 
@@ -67,11 +70,8 @@ export function loadOnlineUsersFromFile() {
     });
   });
 
-  console.log('Loaded online users from file');
+  console.log("Loaded online users from file");
 }
-
-
-
 
 function getOnlineUsersPerSpace() {
   const spaceUsers = {};
@@ -86,15 +86,10 @@ function getOnlineUsersPerSpace() {
   return spaceUsers;
 }
 
-
 function emitOnlineUsersPerSpace(io) {
   const data = getOnlineUsersPerSpace();
   io.emit("space_online_users_all", data);
 }
-
-
-
-
 
 let ioInstance = null;
 
@@ -106,8 +101,8 @@ export default function initSocketIO(io) {
   ioInstance = io;
   loadOnlineUsersFromFile();
 
-  io.on('connection', (socket) => {
-    console.log('Socket.IO connected:', socket.id);
+  io.on("connection", (socket) => {
+    console.log("Socket.IO connected:", socket.id);
 
     // Debug all events
     socket.onAny((event, ...args) => {
@@ -115,7 +110,7 @@ export default function initSocketIO(io) {
     });
 
     // 1️⃣ Register user globally
-    socket.on('user:join', (userId, ack) => {
+    socket.on("user:join", (userId, ack) => {
       if (!userId) return;
 
       let user = onlineUsers.get(userId);
@@ -126,10 +121,9 @@ export default function initSocketIO(io) {
 
       user.sockets.add(socket.id);
       socket.userId = userId;
-      
 
       emitOnlineUsers(io);
-    //   saveOnlineUsersToFile();
+      //   saveOnlineUsersToFile();
 
       if (ack) ack(); // allow client to join chat
     });
@@ -149,40 +143,43 @@ export default function initSocketIO(io) {
     //     });
 
     socket.on("join_chat", async ({ spaceUuid }) => {
-        const userId = socket.userId;
-        if (!userId) return;
+      const userId = socket.userId;
+      if (!userId) return;
 
-        socket.join(`chat:${spaceUuid}`);
+      socket.join(`chat:${spaceUuid}`);
 
-        onlineUsers.get(userId)?.spaces.add(spaceUuid);
+      let user = onlineUsers.get(userId);
+      if (!user) {
+        user = { sockets: new Set(), spaces: new Set() };
+        onlineUsers.set(userId, user);
+      }
 
-        const history = await Message.findBySpace(spaceUuid);
-        socket.emit("receive_message", history);
+      user.spaces.add(spaceUuid);
 
-        emitOnlineUsersPerSpace(io);
+      const history = await Message.findBySpace(spaceUuid);
+
+      // ✅ Send history ONLY to the joining socket
+      socket.emit("receive_message", history);
+
+      emitOnlineUsersPerSpace(io);
     });
-
 
     socket.on("leave_chat", ({ spaceUuid }) => {
-        const userId = socket.userId;
-        if (!userId) return;
+      const userId = socket.userId;
+      if (!userId) return;
 
-        socket.leave(`chat:${spaceUuid}`);
+      socket.leave(`chat:${spaceUuid}`);
 
-        const user = onlineUsers.get(userId);
-        user?.spaces.delete(spaceUuid);
+      const user = onlineUsers.get(userId);
+      user?.spaces.delete(spaceUuid);
 
-        // Emit updated space user map
-        emitOnlineUsersPerSpace(io);
+      // Emit updated space user map
+      emitOnlineUsersPerSpace(io);
     });
 
-
-
-
-
     socket.on("get_online_users", () => {
-        const data = getOnlineUsersPerSpace(); // returns { spaceUuid: [userIds], ... }
-        socket.emit("space_online_users_all", data);
+      const data = getOnlineUsersPerSpace(); // returns { spaceUuid: [userIds], ... }
+      socket.emit("space_online_users_all", data);
     });
 
     // socket.on("send_message", (message) => {
@@ -196,44 +193,36 @@ export default function initSocketIO(io) {
     // });
 
     socket.on("send_message", async (raw) => {
-        try {
-            const message = new Message(raw);
+      try {
+        const message = new Message(raw);
 
-            await message.save();
+        await message.save();
 
-            socket
-                .to(`chat:${message.spaceUuid}`)
-                .emit("receive_message", message);
-        } catch (err) {
-            console.error(err);
-        }
+        io.to(`chat:${message.spaceUuid}`).emit("receive_message", message);
+      } catch (err) {
+        console.error(err);
+      }
     });
-
-
-
-
 
     socket.on("disconnect", () => {
-        const userId = socket.userId;
-        if (!userId) return;
+      const userId = socket.userId;
+      if (!userId) return;
 
-        const user = onlineUsers.get(userId);
-        user?.sockets.delete(socket.id);
+      const user = onlineUsers.get(userId);
+      user?.sockets.delete(socket.id);
 
-        if (user?.sockets.size === 0) {
-            user.spaces.forEach((spaceUuid) => {
-                socket.to(`chat:${spaceUuid}`).emit("user_left", { userId });
-            });
-            onlineUsers.delete(userId);
-        }
+      if (user?.sockets.size === 0) {
+        user.spaces.forEach((spaceUuid) => {
+          socket.to(`chat:${spaceUuid}`).emit("user_left", { userId });
+        });
+        onlineUsers.delete(userId);
+      }
 
-        emitOnlineUsersPerSpace(io);
+      emitOnlineUsersPerSpace(io);
     });
-
   });
 }
 
 function emitOnlineUsers(io) {
-  io.emit('online_users', Array.from(onlineUsers.keys()));
+  io.emit("online_users", Array.from(onlineUsers.keys()));
 }
-

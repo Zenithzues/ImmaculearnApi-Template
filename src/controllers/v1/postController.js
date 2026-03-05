@@ -14,7 +14,7 @@ class PostController {
 
   async create_post(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       // console.log(space_id, post_content);
 
@@ -74,7 +74,7 @@ class PostController {
 
   async create_comment(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id)
         return res
@@ -133,7 +133,7 @@ class PostController {
 
   async get_all_post_by_space_uuid(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const space_uuid = req.params.space_uuid || 0;
 
       if (!account_id)
@@ -182,7 +182,7 @@ class PostController {
 
   async get_all_comment_by_post_id(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const post_id = req.params.post_id || 0;
 
       if (!account_id)

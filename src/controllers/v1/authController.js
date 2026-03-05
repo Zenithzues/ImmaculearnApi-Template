@@ -246,6 +246,8 @@ export class AuthController {
       }
 
       // console.log(cookieVal);
+
+      console.log(cookieVal);
       const { refreshToken, role } = cookieVal;
 
       // if (!refreshToken) {
@@ -326,7 +328,7 @@ export class AuthController {
       res.cookie(
         "refreshToken",
         JSON.stringify({
-          newRefreshToken,
+          refreshToken: newRefreshToken,
           role: role,
         }),
 

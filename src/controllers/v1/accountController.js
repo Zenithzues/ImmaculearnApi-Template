@@ -640,7 +640,7 @@ class AccountController {
     try {
       // const userInfo = await this.user.get(res.locals.account_id);
 
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const userId = req.params.account_id;
 
       console.log(userId, account_id);

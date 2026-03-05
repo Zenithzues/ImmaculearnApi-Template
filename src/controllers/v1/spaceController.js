@@ -39,7 +39,7 @@ class SpaceController {
 
       console.log(space_name, space_description);
 
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id)
         return res
@@ -72,7 +72,7 @@ class SpaceController {
 
   async create_course_space(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id)
         return res
@@ -148,7 +148,7 @@ class SpaceController {
 
   async joinSpace(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid)
@@ -184,7 +184,7 @@ class SpaceController {
 
   async join_space_directly(req, res) {
     try {
-      const account_id = res.locals.account_id || 12;
+      const account_id = res.locals.account_id;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -255,7 +255,7 @@ class SpaceController {
 
   async join_space_by_link(req, res) {
     try {
-      const account_id = res.locals.account_id || 12;
+      const account_id = res.locals.account_id;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -381,7 +381,7 @@ class SpaceController {
 
   async get_all_join_space_by_link(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -405,7 +405,7 @@ class SpaceController {
 
   async get_all_space_invitations(req, res) {
     try {
-      const account_id = res.locals.account_id || 12;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -430,7 +430,7 @@ class SpaceController {
 
   async accept_user_by_joining_link(req, res) {
     try {
-      const owner_id = res.locals.account_id || 1;
+      const owner_id = res.locals.account_id;
       const { space_uuid, invited_account_id } = req.body || {};
 
       console.log(space_uuid);
@@ -484,7 +484,7 @@ class SpaceController {
 
   async decline_request(req, res) {
     try {
-      const owner_id = res.locals.account_id || 1;
+      const owner_id = res.locals.account_id;
       const { space_uuid, invited_account_id } = req.body || {};
 
       if (!space_uuid || !invited_account_id) {
@@ -536,7 +536,7 @@ class SpaceController {
 
   async decline_space_invitation(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -579,7 +579,7 @@ class SpaceController {
 
   async add_user_in_space_by_reg_email(req, res) {
     try {
-      const owner_id = res.locals.account_id || 1;
+      const owner_id = res.locals.account_id;
       const { space_uuid, email } = req.body || {};
 
       if (!space_uuid || !email) {
@@ -717,7 +717,7 @@ class SpaceController {
 
   async get_all_friends_space(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       const result = await this.space.getAllFriendSpaces(account_id);
 
@@ -812,7 +812,7 @@ class SpaceController {
 
   async get_all_space(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       const result = await this.space.getAllSpace(account_id);
 
@@ -853,7 +853,7 @@ class SpaceController {
   async get_join_requests_by_space_id(req, res) {
     try {
       const { space_uuid } = req.params || null;
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!space_uuid)
         return res.json({
@@ -884,7 +884,7 @@ class SpaceController {
       const { space_uuid, user_id } = req.params || {};
       // const status = "accepted";
       const { status } = req.query || {};
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!space_uuid || !user_id || !status)
         return res.json({
@@ -948,7 +948,7 @@ class SpaceController {
   async delete_space(req, res) {
     try {
       const { space_uuid } = req.params || {};
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!space_uuid) {
         return res.status(400).json({
@@ -990,7 +990,7 @@ class SpaceController {
 
   async remove_user_from_space(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const { space_id, user_id } = req.params || {};
 
       console.log(space_id, user_id);
@@ -1035,7 +1035,7 @@ class SpaceController {
 
   async leave_space(req, res) {
     try {
-      const account_id = res.locals.account_id || 12;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -1067,7 +1067,7 @@ class SpaceController {
 
   async add_remarks(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -1118,7 +1118,7 @@ class SpaceController {
 
   async get_remarks_by_space_uuid(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -1210,7 +1210,7 @@ class SpaceController {
 
   async set_archiving(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,

@@ -160,7 +160,7 @@ class FileController {
 
   async upload_resources(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id)
         return res
@@ -265,7 +265,7 @@ class FileController {
   async list_resources_by_space_uuid(req, res) {
     console.log("LIST RESOURCES");
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id)
         return res
           .status(401)
@@ -309,7 +309,7 @@ class FileController {
 
   async deleteResource(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id) {
         return res

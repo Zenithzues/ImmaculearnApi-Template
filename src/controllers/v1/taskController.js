@@ -20,7 +20,7 @@ export class TaskController {
 
   async create_task(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -79,7 +79,7 @@ export class TaskController {
 
   async get_all_task(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -106,7 +106,7 @@ export class TaskController {
 
   async get_all_respondents_by_task_id(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -140,7 +140,7 @@ export class TaskController {
 
   async get_task_respondent_by_student_id(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -167,7 +167,7 @@ export class TaskController {
 
   async get_task_by_space_uuid(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -224,7 +224,7 @@ export class TaskController {
 
   async get_questions_by_task_id(req, res) {
     try {
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (!account_id) {
         return res.status(401).json({
@@ -264,7 +264,7 @@ export class TaskController {
 
   async submit_task_answer(req, res) {
     try {
-      const account_id = res.locals.account_id || 12;
+      const account_id = res.locals.account_id;
       const { task_id, answers } = req.body;
 
       if (!account_id || !task_id || !Array.isArray(answers)) {
@@ -308,7 +308,7 @@ export class TaskController {
         groupsData,
       } = req.body || {};
 
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
 
       if (
         !space_id ||

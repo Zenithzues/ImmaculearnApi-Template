@@ -19,7 +19,10 @@ class AccountController {
 
   async oauthGoogleRedirect(req, res) {
     const role = req.query.role;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const redirectUri =
+      process.env.NODE_ENV === "production"
+        ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
+        : process.env.GOOGLE_REDIRECT_URI;
     const clientId = process.env.GOOGLE_CLIENT_ID;
     console.log(redirectUri);
     const scope = ["openid", "email", "profile"].join(" ");
@@ -47,7 +50,9 @@ class AccountController {
 
       if (!code)
         return res.redirect(
-          "http://localhost:5173/oauth/callback?error=oauth_failed",
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
+            : `http://localhost:5173/oauth/callback?error=oauth_failed`,
         );
 
       // Decode role from state
@@ -60,7 +65,10 @@ class AccountController {
           code,
           client_id: process.env.GOOGLE_CLIENT_ID,
           client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+          redirect_uri:
+            process.env.NODE_ENV === "production"
+              ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
+              : process.env.GOOGLE_REDIRECT_URI,
           grant_type: "authorization_code",
         },
         { headers: { "Content-Type": "application/json" } },
@@ -87,17 +95,21 @@ class AccountController {
 
       if (!result)
         return res.redirect(
-          "http://localhost:5173/oauth/callback?error=not_registered",
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?error=not_registered`
+            : "http://localhost:5173/oauth/callback?error=not_registered",
         );
 
       const { user, role, tempToken, needsOnboarding } = result;
 
-      console.log("NEEEDSSS ON BOARDING:", needsOnboarding);
+      console.log("NEEEDSSS ON BOARDING", needsOnboarding);
 
       if (needsOnboarding) {
         // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
         return res.redirect(
-          `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
 
         // New user → redirect to onboarding page with tempToken
@@ -142,18 +154,20 @@ class AccountController {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 15 * 60 * 1000, // 15 minutes
         });
 
         res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
-          `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
+          process.env.NODE_ENV === "production"
+            ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
       }
 
@@ -164,7 +178,9 @@ class AccountController {
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
-        "http://localhost:5173/oauth/callback?error=oauth_failed",
+        process.env.NODE_ENV === "production"
+          ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
+          : "http://localhost:5173/oauth/callback?error=oauth_failed",
       );
     }
   }
@@ -253,7 +269,10 @@ class AccountController {
         success: true,
         data: {
           space: {
-            space_link: `immaculearn.collab.app/space/${result.space_uuid}`,
+            space_link:
+              process.env.NODE_ENV === "production"
+                ? `${process.env.CLIENT_URL}/space/${result.space_uuid}`
+                : `immaculearn.collab.app/space/${result.space_uuid}`,
             space_name: result.space_name,
             space_description: result.description,
           },
@@ -431,16 +450,24 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         maxAge: 15 * 60 * 1000,
       });
 
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({
+          refreshToken,
+          role: user.role,
+        }),
+
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        },
+      );
 
       return res.status(200).json({
         success: true,
@@ -585,15 +612,15 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
       });
 
       // Send success response
@@ -613,7 +640,7 @@ class AccountController {
     try {
       // const userInfo = await this.user.get(res.locals.account_id);
 
-      const account_id = res.locals.account_id || 1;
+      const account_id = res.locals.account_id;
       const userId = req.params.account_id;
 
       console.log(userId, account_id);

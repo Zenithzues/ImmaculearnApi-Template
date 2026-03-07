@@ -106,12 +106,19 @@ class Space {
     }
   }
 
-  async createSpace(account_id, space_name, space_description, space_settings) {
+  async createSpace(
+    account_id,
+    space_name,
+    space_description,
+    space_cover,
+    space_settings,
+  ) {
     try {
-      const query = `INSERT INTO spaces (space_uuid, space_name, description, settings, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, NOW())`;
+      const query = `INSERT INTO spaces (space_uuid, space_name, description, space_cover, settings, created_by, created_at) VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`;
       const result = await this.db.execute(query, [
         space_name,
         space_description,
+        space_cover,
         space_settings,
         account_id,
       ]);
@@ -145,6 +152,7 @@ class Space {
     acad_term_id,
     space_name,
     space_description,
+    space_cover,
     space_day,
     space_time_start,
     space_time_end,
@@ -153,13 +161,14 @@ class Space {
   ) {
     try {
       const query = `
-      INSERT INTO course_spaces (acad_term_id, c_space_uuid, c_space_name, c_space_description, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) 
-      VALUES (?, UUID(), ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      INSERT INTO course_spaces (acad_term_id, c_space_uuid, c_space_name, c_space_description, c_space_cover, c_space_day, c_space_time_start, c_space_time_end, c_space_yr_lvl, c_space_settings, created_by, created_at) 
+      VALUES (?, UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `;
       const result = await this.db.execute(query, [
         acad_term_id,
         space_name,
         space_description,
+        space_cover,
         space_day,
         space_time_start,
         space_time_end,
@@ -869,40 +878,72 @@ class Space {
             sp.space_name,
             sp.description,
             sp.created_by AS creator,
-            CONCAT('[', GROUP_CONCAT(
+
+            CONCAT(
+              '[',
+              GROUP_CONCAT(DISTINCT
                 CONCAT(
-                    '{"account_id":', acc.account_id,
-                    ',"email":"', IFNULL(acc.email,''),
-                    '","profile_pic":"', IFNULL(acc.profile_pic,''),
-                    '","full_name":"', IFNULL(COALESCE(CONCAT(st.student_fn,' ',st.student_ln), CONCAT(pr.prof_fn,' ',pr.prof_ln)),''),
-                    '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd),''),
-                    '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender),''),
-                    '","course":"', IFNULL(st.student_course,''),
-                    '","year_level":"', IFNULL(st.student_yr_lvl,''),
-                    '","department":"', IFNULL(pr.prof_department,''),
-                    '","role":"', CASE 
+                  '{',
+                    '"account_id":', acc.account_id, ',',
+                    '"email":"', IFNULL(acc.email,''), '",',
+                    '"profile_pic":"', IFNULL(acc.profile_pic,''), '",',
+                    '"full_name":"', IFNULL(
+                        COALESCE(
+                          CONCAT(st.student_fn,' ',st.student_ln), 
+                          CONCAT(pr.prof_fn,' ',pr.prof_ln)
+                        ), ''
+                    ), '",',
+                    '"birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd), ''), '",',
+                    '"gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender), ''), '",',
+                    '"course":"', IFNULL(st.student_course, ''), '",',
+                    '"year_level":"', IFNULL(st.student_yr_lvl, ''), '",',
+                    '"department":"', IFNULL(pr.prof_department, ''), '",',
+                    '"role":"',
+                      CASE 
                         WHEN acc.account_id = sp.created_by THEN 'creator'
                         WHEN st.account_id IS NOT NULL THEN 'student'
                         ELSE 'professor'
-                    END,
-                    '"}'
+                      END,
+                    '"',
+                  '}'
                 )
-            ), ']') AS members
+              ),
+              ']'
+            ) AS members
+
         FROM spaces sp
-        LEFT JOIN space_members spm
-            ON sp.space_id = spm.space_id AND spm.status = 'accepted' 
-        LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id OR acc.account_id = sp.created_by
-        LEFT JOIN students st
-            ON acc.account_id = st.account_id
-        LEFT JOIN professors pr
-            ON acc.account_id = pr.account_id
-        WHERE sp.space_type = 'normal' 
-          AND (sp.created_by = ? OR EXISTS (
-                SELECT 1 FROM space_members sm 
-                WHERE sm.space_id = sp.space_id AND sm.account_id = ?
-              ))
-        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
+
+        /* Join accepted members */
+        LEFT JOIN space_members spm 
+          ON sp.space_id = spm.space_id 
+          AND spm.status = 'accepted'
+
+        /* Join accounts (members + creator) */
+        LEFT JOIN accounts acc 
+          ON acc.account_id = spm.account_id 
+          OR acc.account_id = sp.created_by
+
+        LEFT JOIN students st 
+          ON acc.account_id = st.account_id
+
+        LEFT JOIN professors pr 
+          ON acc.account_id = pr.account_id
+
+        WHERE sp.space_type = 'normal'
+          AND (
+              sp.created_by = ?
+              OR EXISTS (
+                  SELECT 1 
+                  FROM space_members sm 
+                  WHERE sm.space_id = sp.space_id 
+                    AND sm.account_id = ?
+                    AND sm.status = 'accepted'
+              )
+          )
+
+        /* Primary key grouping (clean & safe) */
+        GROUP BY sp.space_id
+
         `,
         [account_id, account_id],
       );
@@ -932,6 +973,7 @@ class Space {
             csp.c_space_uuid,
             csp.c_space_name,
             csp.c_space_description,
+            csp.c_space_cover,
             csp.c_space_day,
             csp.c_space_time_start,
             csp.c_space_time_end,
@@ -1011,15 +1053,22 @@ class Space {
                     AND sm2.status = 'accepted'
                 )
             )
-        GROUP BY 
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.created_by
+        GROUP BY
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_description,
+          csp.c_space_cover,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.created_by,
+          at.acad_term_name,
+          at.semester,
+          creator_prof.prof_fn,
+          creator_prof.prof_ln,
+          creator_acc.profile_pic
         ORDER BY csp.created_at DESC;
         `,
         [account_id, account_id],
@@ -1061,6 +1110,7 @@ class Space {
             sp.space_uuid,
             sp.space_name,
             sp.description,
+            sp.space_cover,
             sp.created_by,
             CONCAT('[', GROUP_CONCAT(
                 CONCAT(
@@ -1089,7 +1139,7 @@ class Space {
             ON acc.account_id = pr.account_id
         WHERE sp.space_type = 'normal' 
           AND sp.created_by = ?
-        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.created_by;
+        GROUP BY sp.space_uuid, sp.space_name, sp.description, sp.space_cover, sp.created_by;
         `,
         [account_id],
       );
@@ -1583,6 +1633,10 @@ class Space {
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
             csp.created_by,
+            CONCAT(
+              '{"name":"', creator_prof.prof_fn, ' ', creator_prof.prof_ln,
+              '","avatar":"', IFNULL(creator_acc.profile_pic, ''), '"}'
+            ) AS professor,
             CONCAT('[', 
                 GROUP_CONCAT(
                     CONCAT(
@@ -1618,12 +1672,15 @@ class Space {
             ON csp.c_space_id = spm.c_space_id 
             AND spm.status = 'accepted'
         LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id 
-            OR acc.account_id = csp.created_by
+            ON acc.account_id = spm.account_id
         LEFT JOIN students st
             ON acc.account_id = st.account_id
         LEFT JOIN professors pr
             ON acc.account_id = pr.account_id
+        LEFT JOIN professors creator_prof
+            ON creator_prof.account_id = csp.created_by
+        LEFT JOIN accounts creator_acc
+            ON creator_acc.account_id = csp.created_by
         LEFT JOIN academic_term at
             ON csp.acad_term_id = at.acad_term_id
         WHERE csp.is_archive = 1 AND EXISTS (
@@ -1650,15 +1707,20 @@ class Space {
                     AND sm2.status = 'accepted'
                 )
             )
-        GROUP BY 
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.created_by
+        GROUP BY
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.created_by,
+          at.acad_term_name,
+          at.semester,
+          creator_prof.prof_fn,
+          creator_prof.prof_ln,
+          creator_acc.profile_pic
         ORDER BY csp.created_at DESC;
         `,
         [account_id, account_id],

@@ -13,10 +13,12 @@ import regprofemailRouter from "./registerprofemailRoutes.js";
 import postRouter from "./postRoutes.js";
 import adminRouter from "./adminRoutes.js";
 import announceRouter from "./announceRoutes.js";
+import academicRouter from "./academicRoutes.js";
 
 const v1 = new Router();
 
 v1.use("/admin", adminRouter);
+v1.use("/academic", academicRouter);
 v1.use("/account", accountRouter);
 v1.use("/auth", authRouter);
 v1.use("/files", fileRouter);

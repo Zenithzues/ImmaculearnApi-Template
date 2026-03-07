@@ -81,6 +81,7 @@ class SpaceController {
       const {
         space_name,
         space_description,
+        space_section,
         space_cover,
         space_day,
         space_time_start,
@@ -122,6 +123,7 @@ class SpaceController {
         academic.acad_term_id,
         space_name,
         space_description,
+        space_section,
         space_cover,
         space_day,
         space_time_start,
@@ -138,6 +140,13 @@ class SpaceController {
         space_uuid: result.space_uuid,
       });
     } catch (err) {
+      if (err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({
+          success: false,
+          message:
+            "A classroom with the same time, day, year, and section already exists.”",
+        });
+      }
       res.json({
         success: false,
         message: err.toString(),

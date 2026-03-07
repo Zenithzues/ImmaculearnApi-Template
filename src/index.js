@@ -58,7 +58,6 @@ initSocketIO(io);
 
 const wss = new WebSocketServer({ noServer: true });
 
-// Handle upgrade requests on SAME server
 server.on("upgrade", (req, socket, head) => {
   if (!req.url || !req.url.startsWith("/crdt")) {
     return;

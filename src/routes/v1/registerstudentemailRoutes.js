@@ -2,13 +2,14 @@ import { Router } from 'express';
 import RegisterStudentEmailController from '../../controllers/v1/registerStudentEmailController.js';
 import upload from '../../middlewares/uplodaExcel.js';
 import authorization from '../../middlewares/authorization.js';
-
+import authentication from '../../middlewares/authentication.js';
 
 const regemailRouter = new Router();
 const regemail = new RegisterStudentEmailController();
 
 
 regemailRouter.use(authorization);
+regemailRouter.use(authentication);
 // Health check
 regemailRouter.get(
   '/',

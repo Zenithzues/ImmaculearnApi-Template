@@ -7,9 +7,9 @@ import authorization from '../../middlewares/authorization.js';
 const regprofemailRouter = new Router();
 const regprofemail = new RegisterProfEmailController();
 
-
 regprofemailRouter.use(authorization);
-// Health check
+regprofemailRouter.use(authentication);
+
 regprofemailRouter.get(
   '/',
   regprofemail.indexAction.bind(regprofemail)

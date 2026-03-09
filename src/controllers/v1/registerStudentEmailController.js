@@ -16,43 +16,47 @@ class RegisterStudentEmailController {
     });
   }
 
-  /*
-  ========================================
-  REGISTER SINGLE EMAIL
-  ========================================
-  */
   async registerEmailAction(req, res) {
-    try {
-      let { email } = req.body;
+  try {
+    let { email } = req.body;
 
-      if (!email) {
-        return res.status(400).json({
-          message: "Email is required",
-        });
-      }
-
-      email = email.trim().toLowerCase();
-
-      const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-
-      if (!gmailRegex.test(email)) {
-        return res.status(400).json({
-          message: "Only Gmail addresses are allowed",
-        });
-      }
-
-      const result = await this.model.one_email(email);
-
-      return res.status(201).json(result);
-
-    } catch (err) {
-      return res.status(500).json({
-        message: "Registration failed",
-        error: err.message,
-      });
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
     }
-  }
 
+    let emails = [];
+
+    // if comma separated string
+    if (typeof email === "string") {
+      emails = email.split(",").map(e => e.trim().toLowerCase());
+    }
+
+    // if array
+    if (Array.isArray(email)) {
+      emails = email.map(e => e.trim().toLowerCase());
+    }
+
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+
+    for (const e of emails) {
+      if (!gmailRegex.test(e)) {
+        return res.status(400).json({
+          message: `Invalid Gmail address: ${e}`
+        });
+      }
+    }
+
+    const result = await this.model.registerEmails(emails);
+
+    return res.status(201).json(result);
+
+  } catch (err) {
+    return res.status(500).json({
+      message: "Email registration failed",
+      error: err.message
+    });
+  }
+}
   /*
   ========================================
   BULK REGISTER

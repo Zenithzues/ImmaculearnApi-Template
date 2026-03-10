@@ -102,6 +102,97 @@ class Task {
     }
   }
 
+  async updateTaskByTaskId(taskData) {
+    const conn = await this.db.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      const {
+        task_id,
+        task_title,
+        task_instruction,
+        task_category,
+        due_date,
+        total_score,
+        lesson_id,
+        questions,
+      } = taskData;
+
+      const dueDate = due_date
+        ? new Date(due_date).toISOString().slice(0, 19).replace("T", " ")
+        : null;
+
+      // Update main task
+      await conn.query(
+        `UPDATE tasks 
+       SET task_title=?, task_instruction=?, task_category=?, due_date=?, total_score=?, lesson_id=? 
+       WHERE task_id=?`,
+        [
+          task_title,
+          task_instruction,
+          task_category,
+          dueDate,
+          total_score,
+          lesson_id,
+          task_id,
+        ],
+      );
+
+      // Delete old questions and choices
+      await conn.query(`DELETE FROM task_questions WHERE task_id=?`, [task_id]);
+
+      // Insert new questions with position
+      for (let idx = 0; idx < questions.length; idx++) {
+        const q = questions[idx];
+
+        const [questionResult] = await conn.query(
+          `INSERT INTO task_questions 
+        (task_id, question, question_type, point, identification_answer, position)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            task_id,
+            q.question,
+            q.question_type,
+            q.point,
+            q.identification_answer || null,
+            idx + 1, // position
+          ],
+        );
+
+        const question_id = questionResult.insertId;
+
+        // Insert choices if MCQ
+        if (
+          (q.question_type === "mcq" || q.question_type === "true-false") &&
+          q.choices
+        ) {
+          for (const c of q.choices) {
+            await conn.query(
+              `INSERT INTO task_choices
+            (question_id, letter_identifier, choice_answer, is_right_answer)
+            VALUES (?, ?, ?, ?)`,
+              [
+                question_id,
+                c.letter_identifier,
+                c.choice_answer,
+                c.isRightAnswer,
+              ],
+            );
+          }
+        }
+      }
+
+      await conn.commit();
+      return task_id;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
   async getTaskByTaskId(task_id) {
     try {
       const task = await this.db.execute(
@@ -162,7 +253,40 @@ class Task {
         [task_id],
       );
 
-      return result[0];
+      const rows = result; // your SQL result
+
+      const questions = Object.values(
+        rows.reduce((acc, row) => {
+          if (!acc[row.question_id]) {
+            acc[row.question_id] = {
+              question_id: row.question_id,
+              task_id: row.task_id,
+              question_type: row.question_type,
+              question: row.question,
+              identification_answer: row.identification_answer,
+              point: row.point,
+              position: row.position,
+              expected_count: row.expected_count,
+              choices: [],
+            };
+          }
+
+          if (row.choice_id) {
+            acc[row.question_id].choices.push({
+              choice_id: row.choice_id,
+              letter_identifier: row.letter_identifier,
+              choice_answer: row.choice_answer,
+              is_right_answer: row.is_right_answer,
+            });
+          }
+
+          return acc;
+        }, {}),
+      );
+
+      // console.log(questions);
+
+      return questions;
     } catch (err) {
       this.logger.error("Error in Task.getQuestionAndAnswerByTaskId", err);
       throw err;

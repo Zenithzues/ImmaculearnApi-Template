@@ -77,6 +77,41 @@ export class TaskController {
     }
   }
 
+  async update_task(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const { taskData } = req.body || {};
+      if (!taskData.task_id) {
+        return res.status(400).json({
+          success: false,
+          message: "task id required.",
+        });
+      }
+
+      // Call model to insert task + questions + choices
+      const taskId = await this.task.updateTaskByTaskId(taskData);
+
+      res.json({
+        success: true,
+        message: "Successfully created task",
+        task_id: taskId,
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.createTask", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Create task failed.",
+      });
+    }
+  }
+
   async get_all_task(req, res) {
     try {
       const account_id = res.locals.account_id;
@@ -487,6 +522,8 @@ export class TaskController {
 
       const taskQuestionAndAnswer =
         await this.task.getQuestionAndAnswerByTaskId(task_id);
+
+      console.log(taskQuestionAndAnswer);
 
       if (!taskQuestionAndAnswer || taskQuestionAndAnswer.length === 0)
         return res.json({

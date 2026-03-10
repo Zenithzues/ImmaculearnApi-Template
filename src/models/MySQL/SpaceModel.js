@@ -694,53 +694,69 @@ class Space {
 
       const spaceIdField =
         spaceType.type === "course" ? "c_space_id" : "space_id";
-      const otherSpaceIdField =
-        spaceType.type === "course" ? "space_id" : "c_space_id";
 
       // Check if already a member
-      const members = await connection.execute(
+      const [members] = await connection.execute(
         `
-        SELECT sm.*, a.account_id 
-        FROM space_members sm
-        LEFT JOIN accounts a
-          ON a.account_id = sm.account_id
-        WHERE sm.${spaceIdField} = ? AND a.email = ?
-        `,
+      SELECT sm.*, a.account_id
+      FROM space_members sm
+      LEFT JOIN accounts a
+        ON a.account_id = sm.account_id
+      WHERE sm.${spaceIdField} = ? AND a.email = ?
+      `,
         [space_id, email],
       );
 
-      if (members[0].length) {
+      if (members.length) {
         throw new Error("User is already a member of this space");
       }
 
-      // Check if invitation already exists
-      const existingInvite = await connection.execute(
+      // Check existing invitation
+      const [invites] = await connection.execute(
         `
-        SELECT * FROM space_invitations
-        WHERE ${spaceIdField} = ?
-          AND invited_email = ?
-          AND invitation_status = 'pending'
-        `,
+      SELECT invitation_id, invitation_status
+      FROM space_invitations
+      WHERE ${spaceIdField} = ?
+        AND invited_email = ?
+      LIMIT 1
+      `,
         [space_id, email],
       );
 
-      if (existingInvite[0].length) {
-        throw new Error("Pending invitation already exists for this email");
-      }
+      if (invites.length) {
+        const invite = invites[0];
 
-      // Insert invitation with appropriate space_id field
-      const insertFields =
-        spaceType.type === "course"
-          ? `(c_space_id, invited_email, invited_by_account_id, join_type, invitation_status, invited_at, expires_at)`
-          : `(space_id, invited_email, invited_by_account_id, join_type, invitation_status, invited_at, expires_at)`;
+        if (invite.invitation_status === "pending") {
+          throw new Error("Pending invitation already exists for this email");
+        }
 
-      await connection.execute(
-        `
+        // Update existing invitation (declined / expired → pending again)
+        await connection.execute(
+          `
+        UPDATE space_invitations
+        SET invitation_status = 'pending',
+            invited_by_account_id = ?,
+            invited_at = NOW(),
+            expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
+        WHERE invitation_id = ?
+        `,
+          [owner_id, invite.invitation_id],
+        );
+      } else {
+        // Insert new invitation
+        const insertFields =
+          spaceType.type === "course"
+            ? `(c_space_id, invited_email, invited_by_account_id, join_type, invitation_status, invited_at, expires_at)`
+            : `(space_id, invited_email, invited_by_account_id, join_type, invitation_status, invited_at, expires_at)`;
+
+        await connection.execute(
+          `
         INSERT INTO space_invitations ${insertFields}
         VALUES (?, ?, ?, 'direct', 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))
         `,
-        [space_id, email, owner_id],
-      );
+          [space_id, email, owner_id],
+        );
+      }
 
       await connection.commit();
       return true;

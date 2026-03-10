@@ -555,13 +555,16 @@ class SpaceController {
         });
       }
 
-      const space = await this.space.getBySpaceUuid(space_uuid);
+      let space = await this.space.getBySpaceUuid(space_uuid);
 
-      if (!space || !space.length) {
-        return res.json({
-          success: false,
-          message: "Invalid space.",
-        });
+      if (!space || space.length === 0) {
+        space = await this.space.getByCourseSpaceUuid(space_uuid);
+
+        if (!space || space.length === 0)
+          return res.json({
+            success: false,
+            message: "Invalid space.",
+          });
       }
 
       // // Only owner can approve
@@ -576,7 +579,7 @@ class SpaceController {
 
       return res.json({
         success: true,
-        message: "User approved successfully.",
+        message: "Declined invitation successfully.",
       });
     } catch (err) {
       return res.json({

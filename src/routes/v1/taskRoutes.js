@@ -11,6 +11,7 @@ taskRouter.use(authorization);
 taskRouter.use(authentication);
 
 taskRouter.post("/", taskController.create_task.bind(taskController));
+taskRouter.patch("/update", taskController.update_task.bind(taskController));
 taskRouter.get(
   "/:space_uuid",
   taskController.get_task_by_space_uuid.bind(taskController),

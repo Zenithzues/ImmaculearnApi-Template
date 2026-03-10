@@ -102,6 +102,73 @@ class Task {
     }
   }
 
+  async getTaskByTaskId(task_id) {
+    try {
+      const task = await this.db.execute(
+        `
+      SELECT 
+        t.task_id,
+        t.space_id,
+        t.c_space_id,
+        t.task_category,
+        t.task_title,
+        t.task_instruction,
+        t.lesson_id,
+        t.total_score,
+        t.due_date,
+        t.created_at,
+        t.updated_at,
+        COALESCE(cs.created_by, s.created_by) AS created_by
+      FROM tasks t
+      LEFT JOIN course_spaces cs 
+        ON t.c_space_id = cs.c_space_id
+      LEFT JOIN spaces s 
+        ON t.space_id = s.space_id
+      WHERE t.task_id = ?
+      `,
+        [task_id],
+      );
+
+      return task[0];
+    } catch (err) {
+      this.logger.error("Error in Task.getTaskByTaskId", err);
+      throw err;
+    }
+  }
+
+  async getQuestionAndAnswerByTaskId(task_id) {
+    try {
+      const result = await this.db.execute(
+        `
+      SELECT
+        q.question_id,
+        q.task_id,
+        q.question_type,
+        q.question,
+        q.identification_answer,
+        q.point,
+        q.position,
+        q.expected_count,
+        c.choice_id,
+        c.letter_identifier,
+        c.choice_answer,
+        c.is_right_answer
+      FROM task_questions q
+      LEFT JOIN task_choices c 
+        ON q.question_id = c.question_id
+      WHERE q.task_id = ?
+      ORDER BY q.position ASC, c.letter_identifier ASC
+      `,
+        [task_id],
+      );
+
+      return result[0];
+    } catch (err) {
+      this.logger.error("Error in Task.getQuestionAndAnswerByTaskId", err);
+      throw err;
+    }
+  }
+
   /**
    * Get tasks by space_id or course space, but always return single space_id
    * @param {number} space_id - normal space

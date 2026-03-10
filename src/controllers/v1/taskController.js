@@ -88,12 +88,12 @@ export class TaskController {
       }
 
       // 3️⃣ Call Task model to fetch tasks
-      const tasks = await this.task.getAllTasks(account_id);
+      // const tasks = await this.task.getAllTasks(account_id);
 
       res.json({
         success: true,
         message: "Successfully fetched tasks",
-        data: tasks, // array of tasks with unified space_id
+        data: [], // array of tasks with unified space_id
       });
     } catch (err) {
       this.logger.error("Error in TaskController.get_task_by_space_uuid", err);
@@ -438,11 +438,11 @@ export class TaskController {
       console.log(`Fetching tasks for space_id: ${space_id}`);
 
       // TODO: Replace with real database call
-      const tasks = await this.task.getDraftedTasksBySpaceId(space_id); // Example placeholder
+      // const tasks = await this.task.getDraftedTasksBySpaceId(space_id); // Example placeholder
 
       return res.json({
         success: true,
-        data: tasks,
+        data: [],
       });
     } catch (err) {
       console.error(
@@ -452,6 +452,62 @@ export class TaskController {
       res.status(500).json({
         success: false,
         message: err.message || "Failed to get drafted tasks.",
+      });
+    }
+  }
+
+  async get_question_answer_by_task_id(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "Unauthenticated professor." });
+
+      const task_id = req.params.task_id;
+
+      if (!task_id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Task ID required" });
+
+      const task = await this.task.getTaskByTaskId(task_id);
+
+      if (!task || task.length === 0)
+        return res
+          .status(404)
+          .json({ success: false, messsage: "Task not found" });
+
+      if (task.created_by !== account_id)
+        return res.status(400).json({
+          success: false,
+          message: "Invalid request, You are not the owner of the task!",
+        });
+
+      const taskQuestionAndAnswer =
+        await this.task.getQuestionAndAnswerByTaskId(task_id);
+
+      if (!taskQuestionAndAnswer || taskQuestionAndAnswer.length === 0)
+        return res.json({
+          success: true,
+          message: "No Question and Answer found.",
+          data: [],
+        });
+
+      return res.json({
+        success: true,
+        message: `Successfully Get Question and Answer with task id ${task_id}`,
+        data: taskQuestionAndAnswer,
+      });
+    } catch (err) {
+      console.error(
+        `Error fetching Questions for task_id ${req.params.task_id}:`,
+        err,
+      );
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to get Questions for task id.",
       });
     }
   }

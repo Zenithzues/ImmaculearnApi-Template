@@ -8,7 +8,13 @@ class Announcement {
   }
 
   // ✅ CREATE ANNOUNCEMENT
-  async createAnnouncement(title, content, target_audience = "ALL", created_by) {
+  async createAnnouncement(
+    title,
+    content,
+    target_audience = "ALL",
+    created_by,
+    imageUrls,
+  ) {
     const conn = await this.db.getConnection();
 
     try {
@@ -20,16 +26,31 @@ class Announcement {
         VALUES (?, ?, ?, 1, ?, NOW(), NOW())
       `;
 
-      const [result] = await conn.execute(query, [
+      const result = await conn.execute(query, [
         title,
         content,
         target_audience,
         created_by,
       ]);
 
+      console.log(result);
+
+      const announce_id = result[0].insertId;
+
+      // save images if uploaded
+      if (imageUrls && imageUrls.length > 0) {
+        const imageQuery = `
+          INSERT INTO announcement_images (announce_id, image_url, created_at)
+          VALUES (?, ?, NOW())
+        `;
+
+        for (const file of imageUrls) {
+          await conn.execute(imageQuery, [announce_id, file]);
+        }
+      }
+
       await conn.commit();
       return result;
-
     } catch (err) {
       await conn.rollback();
       this.logger.error("Error Creating Announcement", {
@@ -39,7 +60,6 @@ class Announcement {
         err,
       });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -51,31 +71,38 @@ class Announcement {
 
     try {
       let query = `
-        SELECT *
-        FROM announcements
-        WHERE is_published = 1
-      `;
+      SELECT 
+          a.*,
+          JSON_ARRAYAGG(ai.image_url) AS images
+      FROM announcements a
+      LEFT JOIN announcement_images ai
+          ON a.announce_id = ai.announce_id
+      WHERE a.is_published = 1
+    `;
 
       const params = [];
 
       if (target_audience && target_audience !== "ALL") {
-        query += ` AND (target_audience = ? OR target_audience = 'ALL')`;
+        query += ` AND (a.target_audience = ? OR a.target_audience = 'ALL')`;
         params.push(target_audience);
       }
 
-      // 🔥 Always get latest 10
-      query += ` ORDER BY announce_id DESC LIMIT 10`;
+      query += ` GROUP BY a.announce_id ORDER BY a.announce_id DESC LIMIT 10`;
 
       const [rows] = await conn.execute(query, params);
-      return rows;
 
+      // Optional: if images is null, set as empty array
+      rows.forEach((r) => {
+        r.images = r.images ? JSON.parse(r.images) : [];
+      });
+
+      return rows;
     } catch (err) {
       this.logger.error("Error Getting Announcements", {
         target_audience,
         err,
       });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -94,14 +121,12 @@ class Announcement {
 
       const [rows] = await conn.execute(query, [announce_id]);
       return rows[0] || null;
-
     } catch (err) {
       this.logger.error("Error Getting Announcement By ID", {
         announce_id,
         err,
       });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -132,7 +157,6 @@ class Announcement {
 
       await conn.commit();
       return result;
-
     } catch (err) {
       await conn.rollback();
       this.logger.error("Error Updating Announcement", {
@@ -140,7 +164,6 @@ class Announcement {
         err,
       });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -162,11 +185,9 @@ class Announcement {
 
       const [rows] = await conn.execute(query);
       return rows;
-
     } catch (err) {
       this.logger.error("Error Getting Student Announcements", { err });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -188,11 +209,9 @@ class Announcement {
 
       const [rows] = await conn.execute(query);
       return rows;
-
     } catch (err) {
       this.logger.error("Error Getting Professor Announcements", { err });
       throw err;
-
     } finally {
       conn.release();
     }
@@ -214,7 +233,6 @@ class Announcement {
 
       await conn.commit();
       return result;
-
     } catch (err) {
       await conn.rollback();
       this.logger.error("Error Deleting Announcement", {
@@ -222,7 +240,6 @@ class Announcement {
         err,
       });
       throw err;
-
     } finally {
       conn.release();
     }

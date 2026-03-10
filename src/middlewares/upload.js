@@ -1,12 +1,12 @@
-import multer from 'multer';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
-import cloudinary from '../config/cloudinary.js';
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    const folder = 'ImmacuLearn';
-    const ext = file.originalname.split('.').pop();
+    const folder = "announcement/images";
+    const ext = file.originalname.split(".").pop();
     const baseName = file.originalname.replace(/\.[^/.]+$/, "");
 
     let publicId = baseName;
@@ -14,22 +14,23 @@ const storage = new CloudinaryStorage({
 
     while (true) {
       try {
-        // check if file exists
-        await cloudinary.api.resource(`${folder}/${publicId}`, { resource_type: 'raw' });
-        // exists → increment
+        await cloudinary.api.resource(`${folder}/${publicId}`, {
+          resource_type: "image",
+        });
         counter++;
         publicId = `${baseName}(${counter})`;
       } catch (err) {
-        // if file not found → break
-        if (err.http_code === 404) break;
-        else throw err; // rethrow other errors
+        // sometimes http_code is undefined
+        if (err.http_code === 404 || err?.error?.message?.includes("not found"))
+          break;
+        else throw err;
       }
     }
 
     return {
       folder,
-      resource_type: 'raw',
-      use_filename: false, // we handle filename with public_id
+      resource_type: "image",
+      use_filename: false,
       public_id: publicId,
       format: ext,
     };

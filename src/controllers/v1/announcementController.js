@@ -13,6 +13,10 @@ class AnnouncementController {
       const created_by = res.locals.admin_id || 1;
       const { title, content, target_audience = "ALL" } = req.body || {};
 
+      const imageUrls = req.files ? req.files.map((file) => file.path) : [];
+
+      console.log(imageUrls);
+
       if (!created_by)
         return res.status(401).json({
           success: false,
@@ -29,7 +33,8 @@ class AnnouncementController {
         title,
         content,
         target_audience,
-        created_by
+        created_by,
+        imageUrls,
       );
 
       return res.status(201).json({
@@ -43,7 +48,6 @@ class AnnouncementController {
           created_by,
         },
       });
-
     } catch (err) {
       this.logger.error("Error in create_announcement", { err });
       res.status(500).json({
@@ -67,7 +71,6 @@ class AnnouncementController {
         total: announcements.length,
         data: announcements,
       });
-
     } catch (err) {
       this.logger.error("Error in get_announcements", { err });
       res.status(500).json({
@@ -101,7 +104,6 @@ class AnnouncementController {
         success: true,
         data: announcement,
       });
-
     } catch (err) {
       this.logger.error("Error in get_announcement_by_id", { err });
       res.status(500).json({
@@ -133,7 +135,7 @@ class AnnouncementController {
         announce_id,
         title,
         content,
-        target_audience
+        target_audience,
       );
 
       if (result.affectedRows === 0)
@@ -146,7 +148,6 @@ class AnnouncementController {
         success: true,
         message: "Announcement updated successfully",
       });
-
     } catch (err) {
       this.logger.error("Error in update_announcement", { err });
       res.status(500).json({
@@ -159,7 +160,8 @@ class AnnouncementController {
   // GET STUDENT ANNOUNCEMENTS
   async get_student_announcements(req, res) {
     try {
-      const announcements = await this.announcementModel.getStudentAnnouncements();
+      const announcements =
+        await this.announcementModel.getStudentAnnouncements();
 
       return res.status(200).json({
         success: true,
@@ -167,7 +169,6 @@ class AnnouncementController {
         total: announcements.length,
         data: announcements,
       });
-
     } catch (err) {
       this.logger.error("Error in get_student_announcements", { err });
       res.status(500).json({
@@ -180,7 +181,8 @@ class AnnouncementController {
   // GET PROFESSOR ANNOUNCEMENTS
   async get_professor_announcements(req, res) {
     try {
-      const announcements = await this.announcementModel.getProfessorAnnouncements();
+      const announcements =
+        await this.announcementModel.getProfessorAnnouncements();
 
       return res.status(200).json({
         success: true,
@@ -188,7 +190,6 @@ class AnnouncementController {
         total: announcements.length,
         data: announcements,
       });
-
     } catch (err) {
       this.logger.error("Error in get_professor_announcements", { err });
       res.status(500).json({
@@ -222,7 +223,6 @@ class AnnouncementController {
         success: true,
         message: "Announcement deleted successfully",
       });
-
     } catch (err) {
       this.logger.error("Error in delete_announcement", { err });
       res.status(500).json({

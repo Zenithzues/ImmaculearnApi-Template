@@ -15,7 +15,10 @@ taskRouter.get(
   "/:space_uuid",
   taskController.get_task_by_space_uuid.bind(taskController),
 );
-
+taskRouter.get(
+  "/question-answer/:task_id",
+  taskController.get_question_answer_by_task_id.bind(taskController),
+);
 taskRouter.get("/", taskController.get_all_task.bind(taskController));
 
 taskRouter.get(

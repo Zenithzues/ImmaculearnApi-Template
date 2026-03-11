@@ -405,6 +405,7 @@ class Task {
       const result = await this.db.execute(
         `
       SELECT
+        s.account_id,
         s.student_fn,
         s.student_ln,
         CONCAT(s.student_fn, ' ', s.student_ln) AS full_name,

@@ -1569,7 +1569,8 @@ class Space {
           CONCAT(s.student_fn, ' ', s.student_ln) AS fullname,
           r.prelim,
           r.midterm,
-          r.prefinals
+          r.prefinals,
+          r.finals
        FROM remarks r
        INNER JOIN students s
          ON s.account_id = r.account_id
@@ -1582,9 +1583,10 @@ class Space {
         account_id: row.account_id,
         fullname: row.fullname,
         grades: {
-          prelim: row.prelim,
-          midterm: row.midterm,
-          prefinals: row.prefinals,
+          prelim: row.prelim === "0.00" ? null : row.prelim,
+          midterm: row.midterm === "0.00" ? null : row.midterm,
+          prefinals: row.prefinals === "0.00" ? null : row.prefinals,
+          finals: row.finals === "0.00" ? null : row.finals,
         },
       }));
     } catch (err) {

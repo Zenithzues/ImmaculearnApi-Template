@@ -141,7 +141,7 @@ export class TaskController {
 
   async get_all_respondents_by_task_id(req, res) {
     try {
-      const account_id = res.locals.account_id;
+      const account_id = res.locals.account_id || 1;
       if (!account_id) {
         return res.status(401).json({
           success: false,
@@ -156,8 +156,58 @@ export class TaskController {
           .status(400)
           .json({ success: false, message: "Invalid Task ID." });
 
+      const taskInfo = await this.task.getTaskByTaskId(task_id);
+
+      if (taskInfo.created_by !== account_id)
+        return res.status(400).json({
+          success: false,
+          message: "You are not the owner of the task.",
+        });
+
       // 3️⃣ Call Task model to fetch tasks
-      const tasks = await this.task.getAllTasks(account_id);
+      const tasks = await this.task.getAllRespondentsByTaskId(task_id);
+
+      res.json({
+        success: true,
+        message: "Successfully fetched tasks",
+        data: tasks, // array of tasks with unified space_id
+      });
+    } catch (err) {
+      this.logger.error("Error in TaskController.get_task_by_space_uuid", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to fetch tasks",
+      });
+    }
+  }
+
+  async get_all_user_completed_task_by_task_id(req, res) {
+    try {
+      const account_id = res.locals.account_id || 1;
+      if (!account_id) {
+        return res.status(401).json({
+          success: false,
+          message: "UnAuthenticated User.",
+        });
+      }
+
+      const task_id = req.params.task_id;
+
+      if (!task_id && typeof task_id !== "number")
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Task ID." });
+
+      const taskInfo = await this.task.getTaskByTaskId(task_id);
+
+      if (taskInfo.created_by !== account_id)
+        return res.status(400).json({
+          success: false,
+          message: "You are not the owner of the task.",
+        });
+
+      // 3️⃣ Call Task model to fetch tasks
+      const tasks = await this.task.getAllUserCompletedTaskByTaskId(task_id);
 
       res.json({
         success: true,

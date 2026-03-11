@@ -23,7 +23,7 @@ class Task {
       // Insert task with proper space_id or c_space_id
       const [taskResult] = await conn.query(
         `INSERT INTO tasks 
-          (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_score, due_date)
+          (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           space_id || null,
@@ -126,7 +126,7 @@ class Task {
       // Update main task
       await conn.query(
         `UPDATE tasks 
-       SET task_title=?, task_instruction=?, task_category=?, due_date=?, total_score=?, lesson_id=? 
+       SET task_title=?, task_instruction=?, task_category=?, due_date=?, total_items_score=?, lesson_id=? 
        WHERE task_id=?`,
         [
           task_title,
@@ -205,7 +205,7 @@ class Task {
         t.task_title,
         t.task_instruction,
         t.lesson_id,
-        t.total_score,
+        t.total_items_score,
         t.due_date,
         t.created_at,
         t.updated_at,
@@ -294,6 +294,152 @@ class Task {
   }
 
   /**
+   * Fetch all questions with choices and respondents' answers for a task
+   * @param {number} task_id
+   * @returns {Promise<Array>} array of questions with choices and answers
+   */
+  async getAllRespondentsByTaskId(task_id) {
+    try {
+      const result = await this.db.execute(
+        `
+        SELECT
+          q.question_id,
+          q.task_id,
+          q.question_type,
+          q.question,
+          q.identification_answer,
+          q.point,
+          q.position,
+          q.expected_count,
+          c.choice_id,
+          c.letter_identifier,
+          c.choice_answer,
+          c.is_right_answer,
+          a.answer_id,
+          a.account_id,
+          a.choice_id AS answered_choice_id,
+          a.answer_text,
+          a.answered_at,
+          s.student_fn,
+          s.student_ln,
+          CONCAT(s.student_fn, ' ', s.student_ln) AS full_name
+        FROM task_questions q
+        LEFT JOIN task_choices c
+          ON q.question_id = c.question_id
+        LEFT JOIN task_answers a
+          ON q.question_id = a.question_id
+        LEFT JOIN students s
+          ON a.account_id = s.account_id
+        WHERE q.task_id = ?
+        ORDER BY q.position ASC, c.letter_identifier ASC, a.answered_at ASC;
+        `,
+        [task_id],
+      );
+
+      const rows = result;
+
+      // Transform rows into nested structure: questions -> choices + answers
+      const questions = Object.values(
+        rows.reduce((acc, row) => {
+          if (!acc[row.question_id]) {
+            acc[row.question_id] = {
+              question_id: row.question_id,
+              task_id: row.task_id,
+              question_type: row.question_type,
+              question: row.question,
+              identification_answer: row.identification_answer,
+              point: row.point,
+              position: row.position,
+              expected_count: row.expected_count,
+              choices: [],
+              answers: [],
+            };
+          }
+
+          // Add choice if it exists and not already added
+          if (row.choice_id) {
+            const exists = acc[row.question_id].choices.some(
+              (ch) => ch.choice_id === row.choice_id,
+            );
+            if (!exists) {
+              acc[row.question_id].choices.push({
+                choice_id: row.choice_id,
+                letter_identifier: row.letter_identifier,
+                choice_answer: row.choice_answer,
+                is_right_answer: row.is_right_answer,
+              });
+            }
+          }
+
+          // Add answer if it exists and not already added
+          if (row.answer_id) {
+            const exists = acc[row.question_id].answers.some(
+              (ans) => ans.answer_id === row.answer_id,
+            );
+            if (!exists) {
+              acc[row.question_id].answers.push({
+                answer_id: row.answer_id,
+                account_id: row.account_id,
+                respondent_name: row.respondent_name,
+                respondent_email: row.respondent_email,
+                choice_id: row.answered_choice_id,
+                answer_text: row.answer_text,
+                answered_at: row.answered_at,
+              });
+            }
+          }
+
+          return acc;
+        }, {}),
+      );
+
+      return questions;
+    } catch (err) {
+      this.logger.error("Error in TaskModel.getAllRespondentsByTaskId", err);
+      throw err;
+    }
+  }
+
+  async getAllUserCompletedTaskByTaskId(task_id) {
+    try {
+      const result = await this.db.execute(
+        `
+      SELECT
+        s.student_fn,
+        s.student_ln,
+        CONCAT(s.student_fn, ' ', s.student_ln) AS full_name,
+        COALESCE(SUM(qs.score),0) AS score,
+        (
+          SELECT SUM(point)
+          FROM task_questions
+          WHERE task_id = ?
+        ) AS total_items_score,
+        MAX(a.answered_at) AS completed_at
+      FROM task_answers a
+      LEFT JOIN task_question_score qs
+        ON a.account_id = qs.account_id
+        AND a.question_id = qs.question_id
+        AND qs.task_id = a.task_id
+      LEFT JOIN students s
+        ON a.account_id = s.account_id
+      WHERE a.task_id = ?
+      GROUP BY a.account_id
+      ORDER BY completed_at ASC
+      `,
+        [task_id, task_id],
+      );
+
+      return result;
+    } catch (err) {
+      this.logger.error(
+        "Error in TaskModel.getAllUserCompletedTaskByTaskId",
+        err,
+      );
+      throw err;
+    }
+  }
+
+  /**
    * Get tasks by space_id or course space, but always return single space_id
    * @param {number} space_id - normal space
    * @param {number} c_space_id - course space
@@ -310,7 +456,7 @@ class Task {
           t.task_title,
           t.task_instruction,
           t.lesson_id,
-          t.total_score,
+          t.total_items_score,
           t.due_date,
           t.created_at,
           t.updated_at,
@@ -366,7 +512,7 @@ class Task {
           t.task_title,
           t.task_instruction,
           t.lesson_id,
-          t.total_score,
+          t.total_items_score,
           t.due_date,
           t.created_at,
           t.updated_at
@@ -417,7 +563,7 @@ class Task {
           t.task_title,
           t.task_instruction,
           t.lesson_id,
-          t.total_score,
+          t.total_items_score,
           t.due_date,
           t.created_at,
           t.updated_at,
@@ -456,7 +602,7 @@ class Task {
           t.task_title,
           t.task_instruction,
           t.lesson_id,
-          t.total_score,
+          t.total_items_score,
           t.due_date,
           t.created_at,
           t.updated_at,
@@ -621,21 +767,27 @@ class Task {
       );
 
       for (const row of textAnswers[0]) {
-        const isCorrect =
-          row.answer_text.trim().toLowerCase() ===
-          row.identification_answer.trim().toLowerCase();
+        const studentAnswer = row.answer_text?.trim().toLowerCase() || "";
+
+        const possibleAnswers =
+          row.identification_answer
+            ?.split(",")
+            .map((ans) => ans.trim().toLowerCase()) || [];
+
+        const isCorrect = possibleAnswers.includes(studentAnswer);
+
         const score = isCorrect ? 1 : 0;
         totalScore += score;
 
         await conn.execute(
           `
-        INSERT INTO task_question_score
-          (task_id, question_id, account_id, is_correct, score)
-        VALUES (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          is_correct = VALUES(is_correct),
-          score = VALUES(score)
-      `,
+          INSERT INTO task_question_score
+            (task_id, question_id, account_id, is_correct, score)
+          VALUES (?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            is_correct = VALUES(is_correct),
+            score = VALUES(score)
+          `,
           [task_id, row.question_id, account_id, isCorrect, score],
         );
       }
@@ -746,7 +898,7 @@ class Task {
   async getUploadedTasksBySpaceId(space_id) {
     try {
       const uploadedQuery = `
-            SELECT id, title, description, total_score, due_date, created_at FROM tasks
+            SELECT id, title, description, total_items_score, due_date, created_at FROM tasks
             WHERE id = ?
         `;
       const result = await this.db.execute(uploadedQuery, [space_id]);
@@ -761,7 +913,7 @@ class Task {
   async getDraftedTasksBySpaceId(space_id) {
     try {
       const draftedQuery = `
-            SELECT id, title, description, total_score, due_date, created_at FROM tasks
+            SELECT id, title, description, total_items_score, due_date, created_at FROM tasks
             WHERE id = ?
         `;
       const result = await this.db.execute(draftedQuery, [space_id]);

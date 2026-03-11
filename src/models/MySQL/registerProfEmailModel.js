@@ -83,8 +83,28 @@ class RegisteredProfEmail {
       };
     }
 
-    // 1️⃣ Check ALL emails (existing and new) for complete profiles
+    // 0️⃣ Check if any emails are already registered as students
     const placeholders = uniqueEmails.map(() => "?").join(",");
+    const [studentEmailRows] = await this.db.execute(
+      `SELECT email FROM registered_student_emails WHERE email IN (${placeholders})`,
+      uniqueEmails
+    );
+    
+    const studentEmails = studentEmailRows.map(r => r.email);
+    
+    if (studentEmails.length > 0) {
+      return {
+        inserted: 0,
+        skipped: uniqueEmails.length,
+        emailsNotSent: studentEmails.length,
+        studentBlocked: studentEmails,
+        totalProcessed: uniqueEmails.length,
+        message: `${studentEmails.length} email(s) are already registered as students and cannot be registered as professors`
+      };
+    }
+
+    // 1️⃣ Check ALL emails (existing and new) for complete profiles
+    const placeholdersForProfiles = uniqueEmails.map(() => "?").join(",");
 
     const [profileRows] = await this.db.execute(
       `SELECT 
@@ -95,7 +115,7 @@ class RegisteredProfEmail {
         s.prof_department
       FROM accounts a
       LEFT JOIN professors s ON s.account_id = a.account_id
-      WHERE a.email IN (${placeholders})`,
+      WHERE a.email IN (${placeholdersForProfiles})`,
       uniqueEmails
     );
 
@@ -111,7 +131,7 @@ class RegisteredProfEmail {
 
     // 2️⃣ Find existing registered emails
     const [existingRows] = await this.db.execute(
-      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholders})`,
+      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholdersForProfiles})`,
       uniqueEmails
     );
 

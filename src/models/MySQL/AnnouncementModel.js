@@ -71,14 +71,10 @@ class Announcement {
 
     try {
       let query = `
-      SELECT 
-          a.*,
-          JSON_ARRAYAGG(ai.image_url) AS images
-      FROM announcements a
-      LEFT JOIN announcement_images ai
-          ON a.announce_id = ai.announce_id
-      WHERE a.is_published = 1
-    `;
+        SELECT a.*
+        FROM announcements a
+        WHERE a.is_published = 1
+      `;
 
       const params = [];
 
@@ -87,16 +83,24 @@ class Announcement {
         params.push(target_audience);
       }
 
-      query += ` GROUP BY a.announce_id ORDER BY a.announce_id DESC LIMIT 10`;
+      query += ` ORDER BY a.announce_id DESC LIMIT 10`;
 
-      const [rows] = await conn.execute(query, params);
+      const [announcements] = await conn.execute(query, params);
 
-      // Optional: if images is null, set as empty array
-      rows.forEach((r) => {
-        r.images = r.images ? JSON.parse(r.images) : [];
-      });
+      // Get images for each announcement separately
+      for (const announcement of announcements) {
+        const imageQuery = `
+          SELECT image_url
+          FROM announcement_images
+          WHERE announce_id = ?
+          ORDER BY image_id ASC
+        `;
+        
+        const [images] = await conn.execute(imageQuery, [announcement.announce_id]);
+        announcement.images = images.map(img => img.image_url);
+      }
 
-      return rows;
+      return announcements;
     } catch (err) {
       this.logger.error("Error Getting Announcements", {
         target_audience,
@@ -183,8 +187,22 @@ class Announcement {
         LIMIT 10
       `;
 
-      const [rows] = await conn.execute(query);
-      return rows;
+      const [announcements] = await conn.execute(query);
+
+      // Get images for each announcement
+      for (const announcement of announcements) {
+        const imageQuery = `
+          SELECT image_url
+          FROM announcement_images
+          WHERE announce_id = ?
+          ORDER BY image_id ASC
+        `;
+        
+        const [images] = await conn.execute(imageQuery, [announcement.announce_id]);
+        announcement.images = images.map(img => img.image_url);
+      }
+
+      return announcements;
     } catch (err) {
       this.logger.error("Error Getting Student Announcements", { err });
       throw err;
@@ -207,8 +225,22 @@ class Announcement {
         LIMIT 10
       `;
 
-      const [rows] = await conn.execute(query);
-      return rows;
+      const [announcements] = await conn.execute(query);
+
+      // Get images for each announcement
+      for (const announcement of announcements) {
+        const imageQuery = `
+          SELECT image_url
+          FROM announcement_images
+          WHERE announce_id = ?
+          ORDER BY image_id ASC
+        `;
+        
+        const [images] = await conn.execute(imageQuery, [announcement.announce_id]);
+        announcement.images = images.map(img => img.image_url);
+      }
+
+      return announcements;
     } catch (err) {
       this.logger.error("Error Getting Professor Announcements", { err });
       throw err;

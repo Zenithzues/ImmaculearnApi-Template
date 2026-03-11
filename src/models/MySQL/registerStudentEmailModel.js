@@ -63,26 +63,33 @@ class RegisteredEmail {
     }
 
     // 0️⃣ Check if any emails are already registered as professors
-    const professorEmails = [];
-    for (const email of uniqueEmails) {
-      const user = await this.userModel.findByEmail(email);
-      if (user && user.role === "professor") {
-        professorEmails.push(email);
-      }
-    }
+    const placeholders = uniqueEmails.map(() => "?").join(",");
 
-    if (professorEmails.length > 0) {
+    console.log("Checking for professor emails:", uniqueEmails);
+
+    const [profEmailRows] = await this.db.execute(
+      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholders})`,
+      uniqueEmails
+    );
+    
+    const profEmails = profEmailRows.map(r => r.email);
+    
+    console.log("Found professor emails:", profEmails);
+    
+    if (profEmails.length > 0) {
+      console.log("Blocking professor emails from student registration");
       return {
         inserted: 0,
         skipped: uniqueEmails.length,
-        emailsNotSent: professorEmails.length,
-        professorBlocked: professorEmails,
+        emailsNotSent: profEmails.length,
+        professorBlocked: profEmails,
         totalProcessed: uniqueEmails.length,
-        message: `${professorEmails.length} email(s) are already registered as professors and cannot be registered as students`
+        message: `${profEmails.length} email(s) are already registered as professors and cannot be registered as students`
       };
     }
+
     // 1️⃣ Check ALL emails for complete student profiles
-    const placeholders = uniqueEmails.map(() => "?").join(",");
+    const profilePlaceholders = uniqueEmails.map(() => "?").join(",");
 
     const [profileRows] = await this.db.execute(
       `SELECT 
@@ -94,7 +101,7 @@ class RegisteredEmail {
         s.student_yr_lvl
       FROM accounts a
       LEFT JOIN students s ON s.account_id = a.account_id
-      WHERE a.email IN (${placeholders})`,
+      WHERE a.email IN (${profilePlaceholders})`,
       uniqueEmails
     );
 
@@ -111,7 +118,7 @@ class RegisteredEmail {
 
     // 2️⃣ Find existing registered emails
     const [existingRows] = await this.db.execute(
-      `SELECT email FROM registered_student_emails WHERE email IN (${placeholders})`,
+      `SELECT email FROM registered_student_emails WHERE email IN (${profilePlaceholders})`,
       uniqueEmails
     );
 

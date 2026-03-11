@@ -553,6 +553,182 @@ class Task {
     }
   }
 
+  async checkIfAllStudentResponse(task_id) {
+    try {
+      const result = await this.db.execute(
+        `
+      SELECT 
+        COUNT(DISTINCT sm.account_id) = COUNT(DISTINCT ta.account_id) AS all_responded
+      FROM tasks t
+
+      LEFT JOIN space_members sm
+        ON (
+          (t.c_space_id IS NOT NULL AND sm.c_space_id = t.c_space_id)
+          OR
+          (t.c_space_id IS NULL AND sm.space_id = t.space_id)
+        )
+
+      LEFT JOIN task_answers ta
+        ON ta.task_id = t.task_id
+        AND ta.account_id = sm.account_id
+
+      WHERE t.task_id = ?
+      `,
+        [task_id],
+      );
+
+      return Boolean(result[0].all_responded);
+    } catch (err) {
+      this.logger.error("Error in TaskModel.checkIfAllStudentResponse", err);
+      throw err;
+    }
+  }
+
+  async getResponseByStudentIdAndTaskId(account_id, task_id) {
+    // Check if all students have completed the task
+    const isAllResponseToTask = await this.checkIfAllStudentResponse(task_id);
+    if (!isAllResponseToTask) return false;
+
+    // Execute query
+    const result = await this.db.execute(
+      `
+    SELECT
+        s.account_id,
+        CONCAT(s.student_ln, ', ', s.student_fn) AS full_name,
+        t.total_items_score,
+        q.question_id,
+        q.question,
+        q.question_type,
+        q.identification_answer,
+        q.point,
+        q.position,
+        c.choice_id,
+        c.letter_identifier,
+        c.choice_answer,
+        c.is_right_answer,
+        a.answer_id,
+        a.answer_text,
+        a.choice_id AS selected_choice_id,
+        a.answered_at,
+        qs.is_correct,
+        qs.score AS question_score,
+        totals.total_score
+    FROM students s
+    LEFT JOIN task_answers a
+        ON a.account_id = s.account_id
+        AND a.task_id = ?
+    LEFT JOIN task_question_score qs
+        ON qs.account_id = s.account_id
+        AND qs.question_id = a.question_id
+        AND qs.task_id = a.task_id
+    LEFT JOIN task_questions q
+        ON q.task_id = ?
+    LEFT JOIN task_choices c
+        ON c.question_id = q.question_id
+    LEFT JOIN tasks t
+        ON t.task_id = q.task_id
+    LEFT JOIN (
+        SELECT account_id, SUM(score) AS total_score
+        FROM task_question_score
+        WHERE task_id = ?
+        GROUP BY account_id
+    ) totals
+        ON totals.account_id = s.account_id
+    WHERE s.account_id IN (
+        SELECT DISTINCT account_id
+        FROM task_answers
+        WHERE task_id = ?
+    )
+    ORDER BY s.account_id, q.position ASC, c.letter_identifier ASC;
+    `,
+      [task_id, task_id, task_id, task_id], // FIXED parameter order
+    );
+
+    const questions = {};
+    const student_answers = {};
+    let score = 0;
+    let total_items_score = 0;
+
+    for (const row of result) {
+      // Capture overall scores
+      score = Number(row.total_score || 0);
+      total_items_score = Number(row.total_items_score || 0);
+
+      // Initialize question object if not exists
+      if (!questions[row.question_id]) {
+        questions[row.question_id] = {
+          question_id: row.question_id,
+          position: row.position,
+          question: row.question,
+          type: row.question_type,
+          answers: [],
+        };
+      }
+
+      // Add choices for MCQ or True-False
+      if (row.choice_id) {
+        const exists = questions[row.question_id].answers.find(
+          (c) => c.letter_identifier === row.letter_identifier,
+        );
+
+        if (!exists) {
+          questions[row.question_id].answers.push({
+            choice_id: row.choice_id,
+            letter_identifier: row.letter_identifier,
+            answer_text: row.choice_answer,
+            is_correct: Boolean(row.is_right_answer),
+          });
+        }
+      }
+
+      // Add identification answer (correct answer reference)
+      if (!row.choice_id && row.question_type === "identification") {
+        if (
+          questions[row.question_id].answers.length === 0 &&
+          row.identification_answer
+        ) {
+          questions[row.question_id].answers.push({
+            answer_text: row.identification_answer,
+            is_correct: true,
+          });
+        }
+      }
+
+      // Map student answers for MCQ / True-False
+      if (row.selected_choice_id) {
+        const selectedChoice = questions[row.question_id].answers.find(
+          (c) => c.choice_id === row.selected_choice_id,
+        );
+        if (selectedChoice) {
+          student_answers[row.question_id] = selectedChoice.letter_identifier;
+        }
+      }
+
+      // Map student answers for Identification / Short-Answer
+      if (row.answer_text && row.question_type === "identification") {
+        student_answers[row.question_id] = row.answer_text;
+      }
+
+      // Fallback True-False choices if none exist in DB
+      if (
+        row.question_type === "true-false" &&
+        questions[row.question_id].answers.length === 0
+      ) {
+        questions[row.question_id].answers.push(
+          { letter_identifier: "T", answer_text: "True", is_correct: true },
+          { letter_identifier: "F", answer_text: "False", is_correct: false },
+        );
+      }
+    }
+
+    return {
+      questions: Object.values(questions),
+      student_answers,
+      score,
+      total_items_score,
+    };
+  }
+
   /**
    * Get tasks by space_id or course space, but always return single space_id
    * @param {number} space_id - normal space

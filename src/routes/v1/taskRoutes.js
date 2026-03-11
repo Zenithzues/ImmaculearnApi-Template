@@ -36,8 +36,9 @@ taskRouter.get(
   "/:task_id/task-completed",
   taskController.get_all_user_completed_task_by_task_id.bind(taskController),
 );
+
 taskRouter.get(
-  "/:task_id/respondents/:student_id",
+  "/:task_id/response/:student_id",
   taskController.get_task_respondent_by_student_id.bind(taskController),
 );
 

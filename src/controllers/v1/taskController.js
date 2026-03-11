@@ -233,8 +233,25 @@ export class TaskController {
         });
       }
 
+      const student_id = req.params.student_id;
+      const task_id = req.params.task_id;
+
+      if (!student_id || !task_id || Number(student_id) !== account_id)
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Request." });
+
       // 3️⃣ Call Task model to fetch tasks
-      const tasks = await this.task.getAllTasks(account_id);
+      const tasks = await this.task.getResponseByStudentIdAndTaskId(
+        student_id,
+        task_id,
+      );
+
+      if (!tasks)
+        return res.status(404).json({
+          success: false,
+          message: "All Student must answer before viewing score",
+        });
 
       res.json({
         success: true,

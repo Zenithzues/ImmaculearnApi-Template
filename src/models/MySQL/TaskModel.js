@@ -124,7 +124,7 @@ class Task {
         : null;
 
       // Update main task
-      await conn.query(
+      await conn.execute(
         `UPDATE tasks 
        SET task_title=?, task_instruction=?, task_category=?, due_date=?, total_items_score=?, lesson_id=? 
        WHERE task_id=?`,
@@ -140,13 +140,15 @@ class Task {
       );
 
       // Delete old questions and choices
-      await conn.query(`DELETE FROM task_questions WHERE task_id=?`, [task_id]);
+      await conn.execute(`DELETE FROM task_questions WHERE task_id=?`, [
+        task_id,
+      ]);
 
       // Insert new questions with position
       for (let idx = 0; idx < questions.length; idx++) {
         const q = questions[idx];
 
-        const [questionResult] = await conn.query(
+        const [questionResult] = await conn.execute(
           `INSERT INTO task_questions 
         (task_id, question, question_type, point, identification_answer, position)
         VALUES (?, ?, ?, ?, ?, ?)`,
@@ -168,7 +170,7 @@ class Task {
           q.choices
         ) {
           for (const c of q.choices) {
-            await conn.query(
+            await conn.execute(
               `INSERT INTO task_choices
             (question_id, letter_identifier, choice_answer, is_right_answer)
             VALUES (?, ?, ?, ?)`,
@@ -405,32 +407,143 @@ class Task {
       const result = await this.db.execute(
         `
       SELECT
-        s.account_id,
-        s.student_fn,
-        s.student_ln,
-        CONCAT(s.student_fn, ' ', s.student_ln) AS full_name,
-        COALESCE(SUM(qs.score),0) AS score,
-        (
-          SELECT SUM(point)
-          FROM task_questions
-          WHERE task_id = ?
-        ) AS total_items_score,
-        MAX(a.answered_at) AS completed_at
-      FROM task_answers a
+          s.account_id,
+          CONCAT(s.student_ln, ', ', s.student_fn) AS full_name,
+          t.total_items_score,
+          q.question_id,
+          q.question,
+          q.question_type,
+          q.identification_answer,
+          q.point,
+          q.position,
+          c.choice_id,
+          c.letter_identifier,
+          c.choice_answer,
+          c.is_right_answer,
+          a.answer_id,
+          a.answer_text,
+          a.choice_id AS selected_choice_id,
+          a.answered_at,
+          qs.is_correct,
+          qs.score AS question_score,
+          totals.total_score
+      FROM students s
+      LEFT JOIN task_answers a
+          ON a.account_id = s.account_id
+          AND a.task_id = ?
       LEFT JOIN task_question_score qs
-        ON a.account_id = qs.account_id
-        AND a.question_id = qs.question_id
-        AND qs.task_id = a.task_id
-      LEFT JOIN students s
-        ON a.account_id = s.account_id
-      WHERE a.task_id = ?
-      GROUP BY a.account_id
-      ORDER BY completed_at ASC
+          ON qs.account_id = s.account_id
+          AND qs.question_id = a.question_id
+          AND qs.task_id = a.task_id
+      LEFT JOIN task_questions q
+          ON q.task_id = ?
+      LEFT JOIN task_choices c
+          ON c.question_id = q.question_id
+      LEFT JOIN tasks t
+          ON t.task_id = q.task_id
+      LEFT JOIN (
+          SELECT account_id, SUM(score) AS total_score
+          FROM task_question_score
+          WHERE task_id = ?
+          GROUP BY account_id
+      ) totals
+          ON totals.account_id = s.account_id
+      WHERE s.account_id IN (
+          SELECT DISTINCT account_id
+          FROM task_answers
+          WHERE task_id = ?
+      )
+      ORDER BY s.account_id, q.position ASC, c.letter_identifier ASC;
       `,
-        [task_id, task_id],
+        [task_id, task_id, task_id, task_id],
       );
 
-      return result;
+      const students = {};
+      const questions = {};
+
+      for (const row of result) {
+        // ---------- STUDENT DATA ----------
+        if (!students[row.account_id]) {
+          students[row.account_id] = {
+            account_id: row.account_id,
+            student_name: row.full_name,
+            score: Number(row.total_score || 0),
+            total_items_score: Number(row.total_items_score || 0),
+            completed_at: row.answered_at,
+            answers: {},
+          };
+        }
+
+        // ---------- STUDENT ANSWERS ----------
+        // Only map the actual answer once per question
+        if (row.question_type === "mcq" && row.selected_choice_id) {
+          // normal MCQs
+          students[row.account_id].answers[row.question_id] =
+            row.letter_identifier;
+        } else if (
+          row.question_type === "true-false" &&
+          row.selected_choice_id
+        ) {
+          // True/False questions
+          students[row.account_id].answers[row.question_id] =
+            row.letter_identifier;
+        } else if (row.question_type === "identification" && row.answer_text) {
+          // identification questions
+          students[row.account_id].answers[row.question_id] = row.answer_text;
+        }
+
+        // ---------- QUIZ QUESTIONS ----------
+        if (!questions[row.question_id]) {
+          questions[row.question_id] = {
+            position: row.position,
+            question_id: row.question_id,
+            question: row.question,
+            question_type: row.question_type,
+            answers: [],
+          };
+        }
+
+        // Add MCQ choices (do not multiply by answers)
+        if (
+          row.choice_id ||
+          row.letter_identifier === "T" ||
+          row.letter_identifier === "F"
+        ) {
+          const exists = questions[row.question_id].answers.find(
+            (c) => c.letter_identifier === row.letter_identifier,
+          );
+          if (!exists) {
+            questions[row.question_id].answers.push({
+              letter_identifier: row.letter_identifier,
+              choice_answer: row.choice_answer,
+              is_correct: Boolean(row.is_right_answer),
+            });
+          }
+        }
+
+        // Add identification answer as a single "correct" option
+        if (!row.choice_id && row.question_type === "identification") {
+          if (questions[row.question_id].answers.length === 0) {
+            questions[row.question_id].answers.push({
+              choice_answer: row.identification_answer,
+              is_correct: true,
+            });
+          }
+        }
+      }
+
+      // Return structured data
+      return {
+        students: Object.values(students),
+        questions: Object.values(questions),
+      };
+
+      // return {
+      //   students: Object.values(students),
+      //   questions: Object.values(questions),
+      // };
+
+      // return result;
     } catch (err) {
       this.logger.error(
         "Error in TaskModel.getAllUserCompletedTaskByTaskId",
@@ -462,61 +575,56 @@ class Task {
           t.created_at,
           t.updated_at,
 
-          COUNT(q.question_id) AS question_count,
+          -- Subquery for question count
+          COALESCE(q_counts.question_count, 0) AS question_count,
 
-          -- Use MAX for these since they come from non-grouped columns
-          MAX(ts.account_id) AS account_id,
-          MAX(ts.score) AS score,
-          MAX(ts.max_score) AS max_score,
+          -- Student score info
+          ts.account_id,
+          ts.score,
+          ts.max_score,
 
-          -- Check if student has answered
-          MAX(CASE WHEN ta.answer_id IS NOT NULL THEN 1 ELSE 0 END) AS has_answered
+          -- Subquery to check if student has answered
+          COALESCE(ta_has.has_answered, 0) AS has_answered
 
       FROM tasks t
 
-      -- Split the OR condition into separate LEFT JOINs
+      -- Access control joins
       LEFT JOIN space_members sm_space 
           ON sm_space.space_id = t.space_id 
           AND sm_space.account_id = ?
+
       LEFT JOIN space_members sm_course 
           ON sm_course.c_space_id = t.c_space_id 
           AND sm_course.account_id = ?
 
-      LEFT JOIN spaces s
-          ON s.space_id = t.space_id
+      LEFT JOIN spaces s ON s.space_id = t.space_id
+      LEFT JOIN course_spaces cs ON cs.c_space_id = t.c_space_id
 
-      LEFT JOIN course_spaces cs
-          ON cs.c_space_id = t.c_space_id
+      -- Subquery: count questions per task
+      LEFT JOIN (
+          SELECT task_id, COUNT(*) AS question_count
+          FROM task_questions
+          GROUP BY task_id
+      ) q_counts ON q_counts.task_id = t.task_id
 
-      LEFT JOIN task_questions q
-          ON q.task_id = t.task_id
+      -- Student answers check
+      LEFT JOIN (
+          SELECT task_id, 1 AS has_answered
+          FROM task_answers
+          WHERE account_id = ?
+          GROUP BY task_id
+      ) ta_has ON ta_has.task_id = t.task_id
 
-      LEFT JOIN task_answers ta
-          ON ta.task_id = t.task_id
-          AND ta.account_id = ?
-
+      -- Student score
       LEFT JOIN task_score ts
           ON ts.task_id = t.task_id
           AND ts.account_id = ?
 
       WHERE
-          -- Check if user has access through any of these conditions
-          (sm_space.account_id IS NOT NULL OR 
-          sm_course.account_id IS NOT NULL OR
-          s.created_by = ? OR 
-          cs.created_by = ?)
-
-      GROUP BY 
-          t.task_id,
-          COALESCE(t.space_id, t.c_space_id),
-          t.task_category,
-          t.task_title,
-          t.task_instruction,
-          t.lesson_id,
-          t.total_items_score,
-          t.due_date,
-          t.created_at,
-          t.updated_at
+          sm_space.account_id IS NOT NULL
+          OR sm_course.account_id IS NOT NULL
+          OR s.created_by = ?
+          OR cs.created_by = ?
 
       ORDER BY t.created_at DESC;
     `;
@@ -526,6 +634,7 @@ class Task {
         account_id, // ts.account_id
         account_id, // sm.account_id
         account_id, // s.created_by
+        account_id, // cs.created_by
         account_id, // cs.created_by
       ];
 

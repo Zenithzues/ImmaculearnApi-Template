@@ -22,6 +22,11 @@ taskRouter.get(
 );
 taskRouter.get("/", taskController.get_all_task.bind(taskController));
 
+// taskRouter.get(
+//   "/:task_id/respondents",
+//   taskController.get_all_respondents_by_task_id.bind(taskController),
+// );
+
 taskRouter.get(
   "/:task_id/respondents",
   taskController.get_all_respondents_by_task_id.bind(taskController),

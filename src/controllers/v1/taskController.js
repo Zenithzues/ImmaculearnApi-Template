@@ -123,12 +123,12 @@ export class TaskController {
       }
 
       // 3️⃣ Call Task model to fetch tasks
-      // const tasks = await this.task.getAllTasks(account_id);
+      const tasks = await this.task.getAllTasks(account_id);
 
       res.json({
         success: true,
         message: "Successfully fetched tasks",
-        data: [], // array of tasks with unified space_id
+        data: tasks, // array of tasks with unified space_id
       });
     } catch (err) {
       this.logger.error("Error in TaskController.get_task_by_space_uuid", err);

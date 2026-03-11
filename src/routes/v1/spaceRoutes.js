@@ -23,6 +23,8 @@ spaceRouter.post("/course-space", space.create_course_space.bind(space));
  */
 spaceRouter.get("/", space.get_all_space.bind(space));
 
+spaceRouter.patch("/:space_uuid", space.update_space.bind(space));
+
 /**
  * Get All Space Information
  */

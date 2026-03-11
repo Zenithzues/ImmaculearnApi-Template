@@ -1774,6 +1774,114 @@ class Space {
       throw err;
     }
   }
+
+
+  async updateSpace(account_id, space_uuid, updates) {
+    const connection = await this.db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      console.log("DEBUG: updateSpace called with:", {
+        account_id,
+        space_uuid,
+        updates
+      });
+      
+      // Check if it's a course space first
+      const [courseSpace] = await connection.execute(
+        "SELECT c_space_id FROM course_spaces WHERE c_space_uuid = ? AND created_by = ?",
+        [space_uuid, account_id]
+      );
+      
+      console.log("DEBUG: courseSpace check:", courseSpace.length > 0 ? "Found course space" : "Not a course space");
+      
+      let result;
+      
+      if (courseSpace.length > 0) {
+        // Update course space
+        console.log("DEBUG: Updating course space");
+        [result] = await connection.execute(
+          `
+          UPDATE course_spaces
+           SET 
+             c_space_name = COALESCE(?, c_space_name),
+             c_space_description = COALESCE(?, c_space_description),
+             c_space_day = COALESCE(?, c_space_day),
+             c_space_time_start = COALESCE(?, c_space_time_start),
+             c_space_time_end = COALESCE(?, c_space_time_end),
+             c_space_yr_lvl = COALESCE(?, c_space_yr_lvl)
+           WHERE c_space_uuid = ? AND created_by = ?
+          `,
+          [
+            updates.space_name ?? null,
+            updates.space_description ?? null,
+            updates.space_day ?? null,
+            updates.space_time_start ?? null,
+            updates.space_time_end ?? null,
+            updates.space_yr_lvl ?? null,
+            space_uuid,
+            account_id,
+          ]
+        );
+        console.log("DEBUG: Course space update result:", result);
+      } else {
+        // Check and update regular space
+        console.log("DEBUG: Checking for regular space");
+        const [regularSpace] = await connection.execute(
+          "SELECT space_id FROM spaces WHERE space_uuid = ? AND created_by = ?",
+          [space_uuid, account_id]
+        );
+        
+        console.log("DEBUG: regularSpace check:", regularSpace.length > 0 ? "Found regular space" : "No space found");
+        
+        if (regularSpace.length > 0) {
+          console.log("DEBUG: Updating regular space");
+          [result] = await connection.execute(
+            `
+            UPDATE spaces
+             SET 
+               space_name = COALESCE(?, space_name),
+               description = COALESCE(?, description)
+             WHERE space_uuid = ? AND created_by = ?
+            `,
+            [
+              updates.space_name ?? null,
+              updates.space_description ?? null, // Use space_description to match request data
+              space_uuid,
+              account_id,
+            ]
+          );
+          console.log("DEBUG: Regular space update result:", result);
+        } else {
+          console.log("DEBUG: Space not found or access denied");
+          throw new Error("Space not found or access denied.");
+        }
+      }
+      
+      console.log("DEBUG: Committing transaction");
+      await connection.commit();
+      
+      if (result.affectedRows === 0) {
+        console.log("DEBUG: No rows affected");
+        throw new Error("Space not found or access denied.");
+      }
+      
+      console.log("DEBUG: Update successful");
+      return { success: true, message: "Space updated successfully." };
+    } catch (err) {
+      console.log("DEBUG: Error in updateSpace:", err);
+      await connection.rollback();
+      this.logger.error("Error updating space", {
+        account_id,
+        space_uuid,
+        err: err.message || err,
+      });
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 export default Space;

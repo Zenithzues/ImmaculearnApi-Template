@@ -1315,6 +1315,48 @@ class SpaceController {
       });
     }
   }
+
+
+
+  async update_space(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+      const space_uuid = req.params.space_uuid;
+      const { space_name, space_description, space_day, space_time_start, space_time_end, space_yr_lvl } = req.body;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+
+      if (!space_uuid) {
+        return res.status(400).json({
+          success: false,
+          message: "Space UUID is required.",
+        });
+      }
+
+      const result = await this.space.updateSpace(account_id, space_uuid, { space_name, space_description, space_day, space_time_start, space_time_end, space_yr_lvl });
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: "Space not found or access denied.",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Space updated successfully.",
+        data: result,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: err.message || "Internal server error.",
+      });
+    }
+  }
 }
 
 export default SpaceController;

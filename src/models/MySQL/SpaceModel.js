@@ -1418,6 +1418,7 @@ class Space {
     prelim = null,
     midterm = null,
     prefinals = null,
+    finals = null,
   ) {
     // Build update data dynamically
 
@@ -1448,13 +1449,13 @@ class Space {
         // Update existing remark
 
         await connection.execute(
-          `UPDATE remarks SET prelim = ?, midterm = ? , prefinals = ? WHERE c_space_id = ? AND account_id = ?`,
-          [prelim, midterm, prefinals, c_space_id, student_id],
+          `UPDATE remarks SET prelim = ?, midterm = ? , prefinals = ? , finals = ? WHERE c_space_id = ? AND account_id = ?`,
+          [prelim, midterm, prefinals, finals, c_space_id, student_id],
         );
       } else {
         // Insert new remark
         await connection.execute(
-          `INSERT INTO remarks (acad_term_id, c_space_id, prof_id, account_id, prelim, midterm, prefinals, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          `INSERT INTO remarks (acad_term_id, c_space_id, prof_id, account_id, prelim, midterm, prefinals, finals, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             acad_term_id,
             c_space_id,
@@ -1463,6 +1464,7 @@ class Space {
             prelim,
             midterm,
             prefinals,
+            finals,
           ],
         );
       }
@@ -1505,7 +1507,8 @@ class Space {
             CONCAT(s.student_fn, ' ', s.student_ln) AS fullname,
             r.prelim,
             r.midterm,
-            r.prefinals
+            r.prefinals,
+            r.finals
         FROM space_members sm
         INNER JOIN students s
             ON s.account_id = sm.account_id
@@ -1522,9 +1525,10 @@ class Space {
         account_id: row.account_id,
         fullname: row.fullname,
         grades: {
-          prelim: row.prelim,
-          midterm: row.midterm,
-          prefinals: row.prefinals,
+          prelim: row.prelim === "0.00" ? null : row.prelim,
+          midterm: row.midterm === "0.00" ? null : row.midterm,
+          prefinals: row.prefinals === "0.00" ? null : row.prefinals,
+          finals: row.finals === "0.00" ? null : row.finals,
         },
       }));
 

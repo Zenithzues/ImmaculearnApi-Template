@@ -1088,6 +1088,8 @@ class SpaceController {
       const { student_id, space_uuid, prelim, midterm, prefinals, finals } =
         req.body || {};
 
+      console.log(prelim, midterm, prefinals);
+
       // const space_uuid = req.params.space_uuid || "";
       // const {}
       if (!space_uuid || !student_id)

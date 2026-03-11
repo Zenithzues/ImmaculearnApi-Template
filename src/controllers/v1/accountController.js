@@ -411,6 +411,8 @@ class AccountController {
     try {
       const { email, password } = req.body || {};
 
+      console.log(email);
+
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -475,7 +477,7 @@ class AccountController {
           {
             role: user.role,
             needsOnboarding: user.needsOnboarding || false,
-            tempToken,
+            tempToken: user.needsOnboarding ? tempToken : "",
           },
         ],
       });

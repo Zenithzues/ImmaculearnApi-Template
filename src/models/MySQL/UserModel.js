@@ -318,8 +318,11 @@ class User {
 
   async verify(email, password) {
     try {
-      const { email: registered_email, role: registered_role } =
-        await this.findByEmail(email);
+      const result = await this.findByEmail(email);
+
+      if (!result) return null;
+
+      const { email: registered_email, role: registered_role } = result;
 
       console.log(registered_email);
       if (!registered_email) return null;

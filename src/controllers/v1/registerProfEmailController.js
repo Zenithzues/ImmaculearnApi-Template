@@ -53,7 +53,10 @@ class RegisterProfEmailController {
 
     const result = await this.model.registerEmails(emails);
 
-    return res.status(201).json(result);
+    return res.status(201).json({
+      message: 'Email registration completed',
+      ...result
+    });
 
   } catch (err) {
     return res.status(500).json({
@@ -108,11 +111,12 @@ class RegisterProfEmailController {
               });
             }
 
-            await this.model.bulkRegisterEmails([...emails]);
+            const result = await this.model.bulkRegisterEmails([...emails]);
 
             return res.json({
               message: 'Bulk email registration completed',
               total: emails.size,
+              ...result
             });
           });
 
@@ -154,11 +158,12 @@ class RegisterProfEmailController {
           });
         }
 
-        await this.model.bulkRegisterEmails([...emails]);
+        const result = await this.model.bulkRegisterEmails([...emails]);
 
         return res.json({
           message: 'Bulk email registration completed',
           total: emails.size,
+          ...result
         });
 
       // ===== INVALID FILE =====

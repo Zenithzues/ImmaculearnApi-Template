@@ -207,6 +207,34 @@ class PostController {
       res.end();
     }
   }
+
+  async delete_post(req, res) {
+    try {
+      const account_id = res.locals.account_id;
+      const post_id = req.params.post_id;
+
+      if (!account_id)
+        return res
+          .status(401)
+          .json({ success: false, message: "UnAuthenticated User!" });
+
+      if (!post_id)
+        return res.json({
+          success: false,
+          message: "Invalid Request, Try Again!",
+        });
+
+      const result = await this.post.deletePost(post_id);
+
+      return res.json({ success: true, data: result });
+    } catch (err) {
+      res.json({
+        success: false,
+        message: err.toString(),
+      });
+      res.end();
+    }
+  }
 }
 
 export default PostController;

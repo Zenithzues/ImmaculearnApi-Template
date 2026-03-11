@@ -200,6 +200,24 @@ class Post {
       throw err;
     }
   }
+
+
+  async deletePost(post_id) {
+    try {
+      const result = await this.db.execute(
+        `
+          DELETE FROM post WHERE post_id = ?
+        `,
+        [post_id],
+      );
+
+      return result;
+    } catch (err) {
+      this.logger.error("Error Deleting Post", { post_id, err });
+      throw err;
+    }
+  }
+  
 }
 
 export default Post;

@@ -48,7 +48,10 @@ class RegisterStudentEmailController {
 
     const result = await this.model.registerEmails(emails);
 
-    return res.status(201).json(result);
+    return res.status(201).json({
+      message: 'Email registration completed',
+      ...result
+    });
 
   } catch (err) {
     return res.status(500).json({

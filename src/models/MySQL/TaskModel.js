@@ -475,21 +475,13 @@ class Task {
         }
 
         // ---------- STUDENT ANSWERS ----------
-        // Only map the actual answer once per question
-        if (row.question_type === "mcq" && row.selected_choice_id) {
-          // normal MCQs
-          students[row.account_id].answers[row.question_id] =
-            row.letter_identifier;
-        } else if (
-          row.question_type === "true-false" &&
-          row.selected_choice_id
-        ) {
-          // True/False questions
-          students[row.account_id].answers[row.question_id] =
-            row.letter_identifier;
-        } else if (row.question_type === "identification" && row.answer_text) {
-          // identification questions
+        if (row.question_type === "identification" && row.answer_text) {
           students[row.account_id].answers[row.question_id] = row.answer_text;
+        } else if (row.selected_choice_id) {
+          if (row.choice_id === row.selected_choice_id) {
+            students[row.account_id].answers[row.question_id] =
+              row.letter_identifier;
+          }
         }
 
         // ---------- QUIZ QUESTIONS ----------
@@ -503,12 +495,8 @@ class Task {
           };
         }
 
-        // Add MCQ choices (do not multiply by answers)
-        if (
-          row.choice_id ||
-          row.letter_identifier === "T" ||
-          row.letter_identifier === "F"
-        ) {
+        // Add unique MCQ / True-False choices
+        if (row.choice_id) {
           const exists = questions[row.question_id].answers.find(
             (c) => c.letter_identifier === row.letter_identifier,
           );
@@ -521,7 +509,7 @@ class Task {
           }
         }
 
-        // Add identification answer as a single "correct" option
+        // Add identification correct answer
         if (!row.choice_id && row.question_type === "identification") {
           if (questions[row.question_id].answers.length === 0) {
             questions[row.question_id].answers.push({
@@ -532,18 +520,10 @@ class Task {
         }
       }
 
-      // Return structured data
       return {
         students: Object.values(students),
         questions: Object.values(questions),
       };
-
-      // return {
-      //   students: Object.values(students),
-      //   questions: Object.values(questions),
-      // };
-
-      // return result;
     } catch (err) {
       this.logger.error(
         "Error in TaskModel.getAllUserCompletedTaskByTaskId",

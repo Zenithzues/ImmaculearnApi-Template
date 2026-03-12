@@ -467,7 +467,7 @@ class AccountController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -639,7 +639,7 @@ class AccountController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -651,7 +651,7 @@ class AccountController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         path: "/",

@@ -20,9 +20,9 @@ export class AuthController {
 
   async profile(req, res) {
     try {
-      const token =
-        req.cookies.accessToken ||
-        req.headers.authorization?.replace("Bearer ", "");
+      const token = req.cookies.accessToken;
+
+      console.log(token);
 
       // this.logger.debug('Profile request', { hasToken: !!token });
 
@@ -184,7 +184,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -330,7 +330,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -554,7 +554,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
+            ? `.${req.get("host")}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",

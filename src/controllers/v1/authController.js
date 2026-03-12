@@ -184,7 +184,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? process.env.API_URL // ADD THIS - with leading dot
+            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -330,7 +330,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? process.env.API_URL // ADD THIS - with leading dot
+            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",
@@ -554,7 +554,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         domain:
           process.env.NODE_ENV === "production"
-            ? process.env.API_URL // ADD THIS - with leading dot
+            ? `.${process.env.API_URL}` // ADD THIS - with leading dot
             : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
         path: "/",

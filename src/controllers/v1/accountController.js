@@ -164,6 +164,8 @@ class AccountController {
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         });
+
+        console.log("COMPLETED IMPLEMENT TOKENS", accessToken, refreshToken);
         return res.redirect(
           process.env.NODE_ENV === "production"
             ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`

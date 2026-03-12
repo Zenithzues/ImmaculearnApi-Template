@@ -165,11 +165,28 @@ class AccountController {
 
           maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         });
-        return res.redirect(
-          process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
-            : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
-        );
+        // return res.redirect(
+        //   process.env.NODE_ENV === "production"
+        //     ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
+        //     : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
+        // );
+        return res.send(`
+        <html>
+        <body>
+        <script>
+          window.opener.postMessage(
+            {
+              type: "OAUTH_SUCCESS",
+              role: "${role}",
+              tempToken: "${tempToken}"
+            },
+            "${process.env.CLIENT_URL}"
+          );
+          window.close();
+        </script>
+        </body>
+        </html>
+        `);
       }
 
       // Existing user → generate JWT

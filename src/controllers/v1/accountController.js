@@ -154,14 +154,15 @@ class AccountController {
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
           maxAge: 15 * 60 * 1000, // 15 minutes
         });
 
         res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
+
           maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
         });
         return res.redirect(
@@ -452,7 +453,7 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
         maxAge: 15 * 60 * 1000,
       });
 
@@ -466,7 +467,7 @@ class AccountController {
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
           maxAge: 30 * 24 * 60 * 60 * 1000,
         },
       );
@@ -614,14 +615,14 @@ class AccountController {
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        sameSite: process.env.NODE_ENV === "production" ? "Lax" : "Strict",
         maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
       });
 

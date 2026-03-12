@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 3000;
 /* ================= EXPRESS APP ================= */
 
 const app = express();
+app.set("trust proxy", 1); // FOR RAILWAY
 const server = http.createServer(app);
 
 app.use(morgan("combined"));

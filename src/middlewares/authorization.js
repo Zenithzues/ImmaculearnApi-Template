@@ -7,15 +7,10 @@
  */
 export default function authorization(req, res, next) {
   // const apikey = req.headers.apikey;
-  const authHeader = req.headers.authorization; // read Authorization header
-  const apikey = authHeader && authHeader.split(" ")[1]; // extract token
+  const apikey = req.headers.apikey;
 
-  if (!apikey || (apikey && apikey !== process.env.API_KEY)) {
-    res.status(401).json({
-      success: false,
-      message: "Unauthorized",
-    });
-    return;
+  if (!apikey || apikey !== process.env.API_KEY) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
   next();

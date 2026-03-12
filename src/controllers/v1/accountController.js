@@ -150,6 +150,8 @@ class AccountController {
       }
 
       if (user) {
+        const url = new URL(process.env.CLIENT_URL);
+
         // Set tokens in HTTP-only cookies
         res.cookie("accessToken", accessToken, {
           httpOnly: true,
@@ -157,7 +159,7 @@ class AccountController {
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           domain:
             process.env.NODE_ENV === "production"
-              ? `.${req.get("host")}` // ADD THIS - with leading dot
+              ? `.${url.host}` // ADD THIS - with leading dot
               : undefined, // No domain in development
           maxAge: 15 * 60 * 1000, // 15 minutes
           path: "/",
@@ -169,7 +171,7 @@ class AccountController {
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
           domain:
             process.env.NODE_ENV === "production"
-              ? `.${req.get("host")}` // ADD THIS - with leading dot
+              ? `.${url.host}` // ADD THIS - with leading dot
               : undefined, // No domain in development
           maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
           path: "/",

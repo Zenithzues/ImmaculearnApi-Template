@@ -155,14 +155,24 @@ class AccountController {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
           maxAge: 15 * 60 * 1000, // 15 minutes
+          path: "/",
         });
 
         res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
           maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
         });
 
         console.log("COMPLETED IMPLEMENT TOKENS", accessToken, refreshToken);
@@ -455,7 +465,12 @@ class AccountController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        maxAge: 15 * 60 * 1000,
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
       });
 
       res.cookie(
@@ -464,12 +479,16 @@ class AccountController {
           refreshToken,
           role: user.role,
         }),
-
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
         },
       );
 
@@ -613,18 +632,29 @@ class AccountController {
       }
 
       // ✅ Set tokens as HTTP-only cookies
+
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
         maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+        path: "/",
       });
 
       // Send success response

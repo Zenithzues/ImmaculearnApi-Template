@@ -177,13 +177,17 @@ export class AuthController {
       }
 
       // 8. Set cookies
+
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        //sameSite: "None",
-        //sameSite: "None",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
       });
 
       res.cookie(
@@ -195,10 +199,13 @@ export class AuthController {
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "Strict",
-          //sameSite: "None",
-          //sameSite: "None",
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
         },
       );
 
@@ -317,12 +324,16 @@ export class AuthController {
         newHashedRefresh,
       );
 
-      // Set new access token cookie
       res.cookie("accessToken", newAccessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        maxAge: 15 * 60 * 1000,
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
       });
 
       res.cookie(
@@ -331,12 +342,16 @@ export class AuthController {
           refreshToken: newRefreshToken,
           role: role,
         }),
-
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
         },
       );
 
@@ -532,13 +547,17 @@ export class AuthController {
       await this.userTokenModel.create(accountId, hashedRefresh);
 
       // 8. Set cookies
+
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        //sameSite: "None",
-        //sameSite: "None",
-        maxAge: 15 * 60 * 1000,
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
       });
 
       res.cookie(
@@ -551,7 +570,12 @@ export class AuthController {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
         },
       );
 

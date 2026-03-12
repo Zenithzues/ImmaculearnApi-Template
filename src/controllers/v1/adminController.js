@@ -5,7 +5,10 @@ import crypto from "crypto";
 import AdminModel from "../../models/MySQL/AdminModel.js";
 import { UserToken } from "../../models/MySQL/UserToken.js";
 import { Logger } from "../../utils/Logger.js";
-import { generateAdminAccessToken ,generateRefreshToken} from "../../utils/tokens.js";
+import {
+  generateAdminAccessToken,
+  generateRefreshToken,
+} from "../../utils/tokens.js";
 
 /**
  * Optional
@@ -55,73 +58,87 @@ class AdminController {
   }
 
   async login(req, res) {
-      try {
-        const { email, password } = req.body || {};
-  
-        if (!email || !password) {
-          return res.status(400).json({
-            success: false,
-            message: "Email and password required",
-          });
-        }
-  
-        const user = await this.admin.verify(email, password);
-  
-        if (!user?.admin_id) {
-          return res.status(401).json({
-            success: false,
-            message: "Invalid email or password",
-          });
-        }
-  
-        const adminId = user.admin_id;
-  
-        const accessToken = generateAdminAccessToken(adminId);
-        const refreshToken = generateRefreshToken();
-  
-        const hashedRefresh = crypto
-          .createHash("sha256")
-          .update(refreshToken)
-          .digest("hex");
-  
-        const existing = await this.userTokenModel.findByAdminId(adminId);
-  
-        if (existing) {
-          await this.userTokenModel.adminUpdate(adminId, hashedRefresh);
-        } else {
-          await this.userTokenModel.adminCreate(adminId, hashedRefresh);
-        }
-  
-        const tempToken = jwtService.sign({ id: adminId, email }, "15m");
-  
-        res.cookie("accessToken", accessToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 15 * 60 * 1000,
-        });
-  
-        res.cookie("refreshToken", JSON.stringify({ refreshToken: refreshToken, role: "Admin" }), {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-  
-        return res.status(200).json({
-          success: true,
-          message: "Welcome Back Admin!",
-          accessToken: accessToken,
-          role: "Admin",
-        });
-      } catch (err) {
-        console.error("Login error:", err);
-        res.status(500).json({
+    try {
+      const { email, password } = req.body || {};
+
+      if (!email || !password) {
+        return res.status(400).json({
           success: false,
-          message: err.toString(),
+          message: "Email and password required",
         });
       }
+
+      const user = await this.admin.verify(email, password);
+
+      if (!user?.admin_id) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      const adminId = user.admin_id;
+
+      const accessToken = generateAdminAccessToken(adminId);
+      const refreshToken = generateRefreshToken();
+
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+
+      const existing = await this.userTokenModel.findByAdminId(adminId);
+
+      if (existing) {
+        await this.userTokenModel.adminUpdate(adminId, hashedRefresh);
+      } else {
+        await this.userTokenModel.adminCreate(adminId, hashedRefresh);
+      }
+
+      const tempToken = jwtService.sign({ id: adminId, email }, "15m");
+
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
+      });
+
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({ refreshToken: refreshToken, role: "Admin" }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
+        },
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Welcome Back Admin!",
+        accessToken: accessToken,
+        role: "Admin",
+      });
+    } catch (err) {
+      console.error("Login error:", err);
+      res.status(500).json({
+        success: false,
+        message: err.toString(),
+      });
     }
+  }
 
   async profile(req, res) {
     try {
@@ -197,7 +214,7 @@ class AdminController {
         this.logger.warn("Invalid token", { error: err.message });
         return res.status(401).json({
           success: false,
-          message: 'Invalid or expired token'
+          message: "Invalid or expired token",
         });
       }
 
@@ -232,104 +249,119 @@ class AdminController {
   }
 
   async refresh(req, res) {
-      try {
-        let cookieVal = req.cookies.refreshToken;
-      
-        // Handle both JSON string and plain string formats
-        if (cookieVal) {
-          try {
-            cookieVal = JSON.parse(cookieVal);
-          } catch (e) {
-            // If parsing fails, treat as plain string with no role
-            cookieVal = { refreshToken: cookieVal, role: null };
-          }
-        }
-      
-        if (!cookieVal) {
-          return res.status(401).json({
-            success: false,
-            message: "No Token Found",
-          });
-        }
+    try {
+      let cookieVal = req.cookies.refreshToken;
 
-        const { refreshToken, role } = cookieVal;
-        
-        if (!refreshToken) {
-          return res.status(401).json({
-            success: false,
-            message: "Refresh token required",
-          });
+      // Handle both JSON string and plain string formats
+      if (cookieVal) {
+        try {
+          cookieVal = JSON.parse(cookieVal);
+        } catch (e) {
+          // If parsing fails, treat as plain string with no role
+          cookieVal = { refreshToken: cookieVal, role: null };
         }
-  
-        // Hash the incoming refresh token
-        const hashedRefresh = crypto
-          .createHash("sha256")
-          .update(refreshToken)
-          .digest("hex");
-  
-        // Find token in database
-        const userTokenRecord =
-          await this.userTokenModel.findByRefresh(hashedRefresh);
-  
-        if (!userTokenRecord) {
-          this.logger.warn("Invalid refresh token");
-          return res.status(401).json({
-            success: false,
-            message: "Invalid refresh token",
-          });
-        }
-  
-        // Check if refresh token is expired
-        if (new Date(userTokenRecord.expires_at) < new Date()) {
-          await this.userTokenModel.invalidate(userTokenRecord.token_id);
-          return res.status(401).json({
-            success: false,
-            message: "Refresh token expired",
-          });
-        }
-  
-        // Generate new access token
-        const newAccessToken = generateAdminAccessToken(userTokenRecord.admin_id);
-  
-        // Generate new refresh token
-        const newRefreshToken = generateRefreshToken();
-        const newHashedRefresh = crypto
-          .createHash("sha256")
-          .update(newRefreshToken)
-          .digest("hex");
-  
-        // Update refresh token in database
-        await this.userTokenModel.adminUpdate(userTokenRecord.admin_id, newHashedRefresh);
-  
-        // Set new access token cookie
-        res.cookie("accessToken", newAccessToken, {
-          secure: process.env.NODE_ENV === "production",
-          httpOnly: true,
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 15 * 60 * 1000, // 15 minutes
-        });
-  
-        // Set new refresh token cookie as JSON
-        res.cookie("refreshToken", JSON.stringify({ refreshToken: newRefreshToken, role: "Admin" }), {
-          secure: process.env.NODE_ENV === "production",
-          httpOnly: true,
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
-  
-        res.json({
-          success: true,
-          message: "Token refreshed successfully",
-          accessToken: newAccessToken,
-        });
-      } catch (err) {
-        this.logger.error("Refresh error", { error: err.message });
-        res.status(500).json({
+      }
+
+      if (!cookieVal) {
+        return res.status(401).json({
           success: false,
-          message: "Server error",
+          message: "No Token Found",
         });
       }
+
+      const { refreshToken, role } = cookieVal;
+
+      if (!refreshToken) {
+        return res.status(401).json({
+          success: false,
+          message: "Refresh token required",
+        });
+      }
+
+      // Hash the incoming refresh token
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+
+      // Find token in database
+      const userTokenRecord =
+        await this.userTokenModel.findByRefresh(hashedRefresh);
+
+      if (!userTokenRecord) {
+        this.logger.warn("Invalid refresh token");
+        return res.status(401).json({
+          success: false,
+          message: "Invalid refresh token",
+        });
+      }
+
+      // Check if refresh token is expired
+      if (new Date(userTokenRecord.expires_at) < new Date()) {
+        await this.userTokenModel.invalidate(userTokenRecord.token_id);
+        return res.status(401).json({
+          success: false,
+          message: "Refresh token expired",
+        });
+      }
+
+      // Generate new access token
+      const newAccessToken = generateAdminAccessToken(userTokenRecord.admin_id);
+
+      // Generate new refresh token
+      const newRefreshToken = generateRefreshToken();
+      const newHashedRefresh = crypto
+        .createHash("sha256")
+        .update(newRefreshToken)
+        .digest("hex");
+
+      // Update refresh token in database
+      await this.userTokenModel.adminUpdate(
+        userTokenRecord.admin_id,
+        newHashedRefresh,
+      );
+
+      res.cookie("accessToken", newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? process.env.API_URL // ADD THIS - with leading dot
+            : undefined, // No domain in development
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: "/",
+      });
+
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({ refreshToken: newRefreshToken, role: "Admin" }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production"
+              ? process.env.API_URL // ADD THIS - with leading dot
+              : undefined, // No domain in development
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+          path: "/",
+        },
+      );
+
+      res.json({
+        success: true,
+        message: "Token refreshed successfully",
+        accessToken: newAccessToken,
+      });
+    } catch (err) {
+      this.logger.error("Refresh error", { error: err.message });
+      res.status(500).json({
+        success: false,
+        message: "Server error",
+      });
     }
+  }
 
   async get_all_academic(req, res) {
     try {

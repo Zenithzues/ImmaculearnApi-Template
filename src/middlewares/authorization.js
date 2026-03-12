@@ -6,7 +6,6 @@
  * @param {import('express').NextFunction} next
  */
 export default function authorization(req, res, next) {
-  // const apikey = req.headers.apikey;
   const apikey = req.headers.apikey;
 
   if (!apikey || apikey !== process.env.API_KEY) {

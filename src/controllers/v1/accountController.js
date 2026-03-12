@@ -152,6 +152,8 @@ class AccountController {
       if (user) {
         const url = new URL(process.env.CLIENT_URL);
 
+        console.log(url);
+
         // Set tokens in HTTP-only cookies
         res.cookie("accessToken", accessToken, {
           httpOnly: true,

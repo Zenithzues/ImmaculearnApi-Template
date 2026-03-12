@@ -11,6 +11,8 @@ authRouter.use(authorization);
 
 authRouter.get("/profile", authController.profile.bind(authController));
 
+authRouter.post("/exchange", authController.exchange.bind(authController));
+
 authRouter.post("/login", authController.login.bind(authController));
 authRouter.post("/logout", authController.logout.bind(authController));
 authRouter.get("/refresh", authController.refresh.bind(authController));

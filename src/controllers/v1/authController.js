@@ -18,6 +18,113 @@ export class AuthController {
     this.user = new User();
   }
 
+  async verifyTempToken(tempToken) {
+    try {
+      // Verify the JWT token
+      const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+
+      console.log("Decoded tempToken:", decoded);
+
+      // Get full user data from database
+      const user = await this.userModel.findById(decoded.userId);
+
+      if (!user) {
+        console.log("User not found for ID:", decoded.userId);
+        return null;
+      }
+
+      return {
+        id: user.account_id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        role: decoded.role || user.role,
+        needsOnboarding: decoded.needsOnboarding,
+      };
+    } catch (error) {
+      console.error("Temp token verification failed:", error.message);
+      return null;
+    }
+  }
+
+  async exchange(req, res) {
+    try {
+      const { tempToken } = req.body;
+
+      // Verify tempToken and get user
+      const user = await this.verifyTempToken(tempToken);
+
+      if (!user) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      // Generate new tokens
+      const accessToken = generateAccessToken(user.id, user.role);
+      const refreshToken = generateRefreshToken();
+
+      // Store refresh token in DB
+      const hashedRefresh = crypto
+        .createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+
+      const existingToken = await this.userTokenModel.findByUserId(user.id);
+
+      if (existingToken) {
+        await this.userTokenModel.update(user.id, hashedRefresh);
+      } else {
+        await this.userTokenModel.create(user.id, hashedRefresh);
+      }
+
+      // Set cookies in the PARENT window response
+      const url = new URL(process.env.CLIENT_URL);
+
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        domain:
+          process.env.NODE_ENV === "production" ? `.${url.host}` : undefined,
+        maxAge: 15 * 60 * 1000,
+        path: "/",
+      });
+
+      res.cookie(
+        "refreshToken",
+        JSON.stringify({ refreshToken, role: user.role }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          domain:
+            process.env.NODE_ENV === "production" ? `.${url.host}` : undefined,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+          path: "/",
+        },
+      );
+
+      // Return user data
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          picture: user.picture,
+          role: user.role,
+        },
+        role: user.role,
+        needsOnboarding: user.needsOnboarding,
+      });
+
+      // Optional: Delete tempToken so it can't be used again
+      // await deleteTempToken(tempToken);
+    } catch (error) {
+      console.error("Exchange error:", error);
+      res.status(500).json({ error: "Exchange failed" });
+    }
+  }
+
   async profile(req, res) {
     try {
       const token = req.cookies.accessToken;

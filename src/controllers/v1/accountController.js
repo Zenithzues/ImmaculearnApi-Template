@@ -46,26 +46,33 @@ class AccountController {
   async oauthGoogleCallback(req, res) {
     try {
       const code = req.query.code;
+      // const state = req.query.state;
 
-      if (!code) {
+      if (!code)
         return res.redirect(
           process.env.NODE_ENV === "production"
             ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
             : `http://localhost:5173/oauth/callback?error=oauth_failed`,
         );
-      }
+
+      // Decode role from state
+      // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
 
       // Exchange code for access token
-      const tokenRes = await axios.post("https://oauth2.googleapis.com/token", {
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri:
-          process.env.NODE_ENV === "production"
-            ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
-            : process.env.GOOGLE_REDIRECT_URI,
-        grant_type: "authorization_code",
-      });
+      const tokenRes = await axios.post(
+        "https://oauth2.googleapis.com/token",
+        {
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          redirect_uri:
+            process.env.NODE_ENV === "production"
+              ? process.env.GOOGLE_REDIRECT_URI_DEPLOYED
+              : process.env.GOOGLE_REDIRECT_URI,
+          grant_type: "authorization_code",
+        },
+        { headers: { "Content-Type": "application/json" } },
+      );
 
       const { access_token } = tokenRes.data;
 
@@ -77,65 +84,64 @@ class AccountController {
 
       const { sub: googleId, email, name, picture } = userInfoRes.data;
 
-      // Find or create user
+      // Find or create partial user with role
       const result = await this.findOrCreate({
         googleId,
         email,
         name,
         picture,
+        // role
       });
 
-      if (!result) {
+      if (!result)
         return res.redirect(
           process.env.NODE_ENV === "production"
             ? `${process.env.CLIENT_URL}/oauth/callback?error=not_registered`
             : "http://localhost:5173/oauth/callback?error=not_registered",
         );
-      }
 
       const { user, role, tempToken, needsOnboarding } = result;
 
-      // IMPORTANT: Check if this is a popup request
-      const isPopup = req.query.popup === "true";
-
-      console.log("Auth request:", {
-        isPopup,
-        email: user.email,
-        role,
-        needsOnboarding,
-      });
+      console.log("NEEEDSSS ON BOARDING", needsOnboarding);
 
       if (needsOnboarding) {
-        // For onboarding, always redirect with tempToken
-        const redirectUrl = new URL(
+        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
+        return res.redirect(
           process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback`
-            : "http://localhost:5173/oauth/callback",
+            ? `${process.env.CLIENT_URL}/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
         );
 
-        redirectUrl.searchParams.append("needsOnboarding", "true");
-        redirectUrl.searchParams.append("role", role);
-        redirectUrl.searchParams.append("tempToken", tempToken);
-        if (isPopup) {
-          redirectUrl.searchParams.append("popup", "true");
-        }
-
-        return res.redirect(redirectUrl.toString());
+        // New user → redirect to onboarding page with tempToken
+        // return res.json({
+        //   message: "Onboarding required",
+        //   tempToken,
+        //   user,
+        // });
       }
 
-      // Generate tokens for existing user
+      // Existing user → generate access & refresh tokens
       const accessToken = generateAccessToken(user.account_id, role);
       const refreshToken = generateRefreshToken();
 
-      // Store refresh token in DB
+      console.log("REFRESH TOKEN GENERATED: ", refreshToken);
+
+      // const { account_id, googleId: google_id} = user;
+
+      // Hash refresh token before storing in DB
+
+      // console.log(account_id, google_id)
+
+      console.log(user);
       const hashedRefresh = crypto
         .createHash("sha256")
         .update(refreshToken)
         .digest("hex");
-
       const existingToken = await this.userTokenModel.findByUserId(
         user.account_id,
       );
+
+      // console.log(existingToken)
 
       if (existingToken) {
         await this.userTokenModel.update(user.account_id, hashedRefresh);
@@ -143,54 +149,32 @@ class AccountController {
         await this.userTokenModel.create(user.account_id, hashedRefresh);
       }
 
-      // FOR POPUP: Only redirect with tempToken (NO COOKIES)
-      if (isPopup) {
-        console.log("🎯 Popup detected - redirecting with tempToken only");
+      if (user) {
+        // Set tokens in HTTP-only cookies
+        res.cookie("accessToken", accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 15 * 60 * 1000, // 15 minutes
+        });
 
-        const redirectUrl = new URL(
+        res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
+        });
+        return res.redirect(
           process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback`
-            : "http://localhost:5173/oauth/callback",
+            ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
+            : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
         );
-
-        redirectUrl.searchParams.append("role", role);
-        redirectUrl.searchParams.append("tempToken", tempToken);
-        redirectUrl.searchParams.append("popup", "true");
-
-        return res.redirect(redirectUrl.toString());
       }
 
-      // FOR DIRECT FLOW (not popup): Set cookies normally
-      console.log("🎯 Direct flow - setting cookies");
+      // Existing user → generate JWT
+      // const sessionToken = jwtService.sign({ id: user.id });
 
-      const url = new URL(process.env.CLIENT_URL);
-
-      res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production" ? `.${url.host}` : undefined,
-        maxAge: 15 * 60 * 1000,
-        path: "/",
-      });
-
-      res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production" ? `.${url.host}` : undefined,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
-
-      // Redirect to callback (without popup flag)
-      return res.redirect(
-        process.env.NODE_ENV === "production"
-          ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
-          : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
-      );
+      // return res.redirect("http://localhost:5173/home");
     } catch (error) {
       console.error("OAuth error:", error.response?.data || error.message);
       return res.redirect(
@@ -469,12 +453,7 @@ class AccountController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? `.${req.get("host")}` // ADD THIS - with leading dot
-            : undefined, // No domain in development
-        maxAge: 15 * 60 * 1000, // 15 minutes
-        path: "/",
+        maxAge: 15 * 60 * 1000,
       });
 
       res.cookie(
@@ -483,16 +462,12 @@ class AccountController {
           refreshToken,
           role: user.role,
         }),
+
         {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          domain:
-            process.env.NODE_ENV === "production"
-              ? `.${req.get("host")}` // ADD THIS - with leading dot
-              : undefined, // No domain in development
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
-          path: "/",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
         },
       );
 
@@ -636,29 +611,18 @@ class AccountController {
       }
 
       // ✅ Set tokens as HTTP-only cookies
-
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? `.${req.get("host")}` // ADD THIS - with leading dot
-            : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
-        path: "/",
       });
 
       res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? `.${req.get("host")}` // ADD THIS - with leading dot
-            : undefined, // No domain in development
         maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
-        path: "/",
       });
 
       // Send success response

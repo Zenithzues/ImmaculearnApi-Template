@@ -101,12 +101,7 @@ class AdminController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? process.env.API_URL // ADD THIS - with leading dot
-            : undefined, // No domain in development
-        maxAge: 15 * 60 * 1000, // 15 minutes
-        path: "/",
+        maxAge: 15 * 60 * 1000,
       });
 
       res.cookie(
@@ -116,12 +111,7 @@ class AdminController {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          domain:
-            process.env.NODE_ENV === "production"
-              ? `.${req.get("host")}` // ADD THIS - with leading dot
-              : undefined, // No domain in development
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
-          path: "/",
+          maxAge: 7 * 24 * 60 * 60 * 1000,
         },
       );
 
@@ -321,31 +311,23 @@ class AdminController {
         newHashedRefresh,
       );
 
+      // Set new access token cookie
       res.cookie("accessToken", newAccessToken, {
-        httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? `.${req.get("host")}` // ADD THIS - with leading dot
-            : undefined, // No domain in development
         maxAge: 15 * 60 * 1000, // 15 minutes
-        path: "/",
       });
 
+      // Set new refresh token cookie as JSON
       res.cookie(
         "refreshToken",
         JSON.stringify({ refreshToken: newRefreshToken, role: "Admin" }),
         {
-          httpOnly: true,
           secure: process.env.NODE_ENV === "production",
+          httpOnly: true,
           sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          domain:
-            process.env.NODE_ENV === "production"
-              ? `.${req.get("host")}` // ADD THIS - with leading dot
-              : undefined, // No domain in development
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
-          path: "/",
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         },
       );
 

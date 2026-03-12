@@ -37,7 +37,12 @@ class SpaceController {
         ? JSON.stringify(space_settings)
         : JSON.stringify(defaultSettings);
 
-      console.log(space_name, space_description);
+      console.log("DEBUG create_space:", {
+        space_name,
+        space_description,
+        space_cover,
+        space_settings
+      });
 
       const account_id = res.locals.account_id;
 

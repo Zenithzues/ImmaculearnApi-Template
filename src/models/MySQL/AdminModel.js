@@ -40,6 +40,12 @@ class AdminModel {
         [email],
       );
 
+      // Check if admin exists
+      if (!admin || admin.length === 0) {
+        this.logger.warn("Admin not found", { email });
+        return null;
+      }
+
       const isValid = await verifyPassword(admin[0].admin_password, password);
 
       if (!isValid) {

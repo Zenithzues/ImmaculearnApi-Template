@@ -46,19 +46,9 @@ class AccountController {
   async oauthGoogleCallback(req, res) {
     try {
       const code = req.query.code;
-      // const state = req.query.state;
+      if (!code) throw new Error("No code received from Google");
 
-      if (!code)
-        return res.redirect(
-          process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
-            : `http://localhost:5173/oauth/callback?error=oauth_failed`,
-        );
-
-      // Decode role from state
-      // const { role } = JSON.parse(Buffer.from(state, 'base64').toString());
-
-      // Exchange code for access token
+      // 1️⃣ Exchange code for tokens
       const tokenRes = await axios.post(
         "https://oauth2.googleapis.com/token",
         {
@@ -76,7 +66,7 @@ class AccountController {
 
       const { access_token } = tokenRes.data;
 
-      // Fetch Google profile
+      // 2️⃣ Get Google user info
       const userInfoRes = await axios.get(
         "https://www.googleapis.com/oauth2/v3/userinfo",
         { headers: { Authorization: `Bearer ${access_token}` } },
@@ -84,55 +74,22 @@ class AccountController {
 
       const { sub: googleId, email, name, picture } = userInfoRes.data;
 
-      // Find or create partial user with role
+      // 3️⃣ Find or create user in DB
       const result = await this.findOrCreate({
         googleId,
         email,
         name,
         picture,
-        // role
       });
-
-      if (!result)
-        return res.redirect(
-          process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback?error=not_registered`
-            : "http://localhost:5173/oauth/callback?error=not_registered",
-        );
+      if (!result) throw new Error("User not registered");
 
       const { user, role, tempToken, needsOnboarding } = result;
 
-      console.log("NEEEDSSS ON BOARDING", needsOnboarding);
-
-      if (needsOnboarding) {
-        // return res.redirect(`http://localhost:5173/onboarding?role=${role}`)
-        return res.redirect(
-          process.env.NODE_ENV === "production"
-            ? `${process.env.CLIENT_URL}/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`
-            : `http://localhost:5173/oauth/callback?needsOnboarding=${needsOnboarding}&role=${role}&tempToken=${tempToken}`,
-        );
-
-        // New user → redirect to onboarding page with tempToken
-        // return res.json({
-        //   message: "Onboarding required",
-        //   tempToken,
-        //   user,
-        // });
-      }
-
-      // Existing user → generate access & refresh tokens
+      // 4️⃣ Generate app tokens
       const accessToken = generateAccessToken(user.account_id, role);
       const refreshToken = generateRefreshToken();
 
-      console.log("REFRESH TOKEN GENERATED: ", refreshToken);
-
-      // const { account_id, googleId: google_id} = user;
-
-      // Hash refresh token before storing in DB
-
-      // console.log(account_id, google_id)
-
-      console.log(user);
+      // Optional: hash refresh token and store in DB
       const hashedRefresh = crypto
         .createHash("sha256")
         .update(refreshToken)
@@ -140,66 +97,62 @@ class AccountController {
       const existingToken = await this.userTokenModel.findByUserId(
         user.account_id,
       );
-
-      // console.log(existingToken)
-
       if (existingToken) {
         await this.userTokenModel.update(user.account_id, hashedRefresh);
       } else {
         await this.userTokenModel.create(user.account_id, hashedRefresh);
       }
 
-      if (user) {
-        // Set tokens in HTTP-only cookies
-        res.cookie("accessToken", accessToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
-          maxAge: 15 * 60 * 1000, // 15 minutes
-        });
+      // 5️⃣ Set cookies (cross-site safe)
+      const cookieOptions = {
+        httpOnly: true,
+        secure: true, // must be true in production
+        sameSite: "None", // cross-site OAuth popup
+      };
 
-        res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+      res.cookie("accessToken", accessToken, {
+        ...cookieOptions,
+        maxAge: 15 * 60 * 1000,
+      });
+      res.cookie("refreshToken", JSON.stringify({ refreshToken, role }), {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
 
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 7 days
-        });
-        // return res.redirect(
-        //   process.env.NODE_ENV === "production"
-        //     ? `${process.env.CLIENT_URL}/oauth/callback?role=${role}&tempToken=${tempToken}`
-        //     : `http://localhost:5173/oauth/callback?role=${role}&tempToken=${tempToken}`,
-        // );
-        return res.send(`
-        <html>
+      // 6️⃣ Send HTML to popup to postMessage and close
+      res.send(`
+      <html>
         <body>
-        <script>
-          window.opener.postMessage(
-            {
-              type: "OAUTH_SUCCESS",
-              role: "${role}",
-              tempToken: "${tempToken}"
-            },
-            "${process.env.CLIENT_URL}"
-          );
-          window.close();
-        </script>
+          <script>
+            window.opener.postMessage(
+              {
+                type: "OAUTH_SUCCESS",
+                role: "${role}",
+                needsOnboarding: ${needsOnboarding},
+                token: "${tempToken || ""}"
+              },
+              "${process.env.CLIENT_URL}"
+            );
+            window.close();
+          </script>
         </body>
-        </html>
-        `);
-      }
-
-      // Existing user → generate JWT
-      // const sessionToken = jwtService.sign({ id: user.id });
-
-      // return res.redirect("http://localhost:5173/home");
-    } catch (error) {
-      console.error("OAuth error:", error.response?.data || error.message);
-      return res.redirect(
-        process.env.NODE_ENV === "production"
-          ? `${process.env.CLIENT_URL}/oauth/callback?error=oauth_failed`
-          : "http://localhost:5173/oauth/callback?error=oauth_failed",
-      );
+      </html>
+    `);
+    } catch (err) {
+      console.error("OAuth error:", err.response?.data || err.message);
+      res.send(`
+      <html>
+        <body>
+          <script>
+            window.opener.postMessage(
+              { type: "OAUTH_ERROR", error: "${err.message}" },
+              "${process.env.CLIENT_URL}"
+            );
+            window.close();
+          </script>
+        </body>
+      </html>
+    `);
     }
   }
 

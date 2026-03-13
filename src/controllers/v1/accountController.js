@@ -122,8 +122,6 @@ class AccountController {
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
-      // 6️⃣ Send HTML to popup to postMessage and close
-
       console.log("SENDING TO FRONTENDDDD");
       res.send(`
       <html>

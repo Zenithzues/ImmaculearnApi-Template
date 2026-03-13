@@ -108,6 +108,8 @@ class AccountController {
         httpOnly: true,
         secure: true, // must be true in production
         sameSite: "None", // cross-site OAuth popup
+        domain: process.env.NODE_ENV === "production" ? ".up.railway.app" : undefined,
+        path: "/"
       };
 
       res.cookie("accessToken", accessToken, {

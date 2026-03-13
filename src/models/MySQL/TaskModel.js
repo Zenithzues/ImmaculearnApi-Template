@@ -17,14 +17,25 @@ class Task {
    */
   async createTask(taskData, space_id, c_space_id) {
     const conn = await this.db.getConnection();
+
+    const allowedCategories = [
+      "quiz",
+      "individual-activity",
+      "group-activity",
+      "exam",
+    ];
+
+    if (!allowedCategories.includes(taskData.task_category)) {
+      throw new Error("Invalid task category");
+    }
+
     try {
       await conn.beginTransaction();
 
-      // Insert task with proper space_id or c_space_id
       const [taskResult] = await conn.query(
-        `INSERT INTO tasks 
-          (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO tasks
+      (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           space_id || null,
           c_space_id || null,
@@ -32,47 +43,75 @@ class Task {
           taskData.task_title,
           taskData.task_instruction,
           taskData.lesson_id,
-          taskData.total_score,
+          taskData.total_score || taskData.task_score,
           new Date(taskData.due_date),
         ],
       );
 
       const taskId = taskResult.insertId;
 
+      /*
+      ============================
+      GROUP ACTIVITY PROCESS
+      ============================
+    */
+      if (taskData.task_category === "group-activity") {
+        if (Array.isArray(taskData.groups) && taskData.groups.length) {
+          const groupRows = taskData.groups.map((g) => [taskId, g.group_name]);
+
+          await conn.query(
+            `INSERT INTO task_groups (task_id, group_name)
+           VALUES ?`,
+            [groupRows],
+          );
+        }
+
+        await conn.commit();
+        return taskId;
+      }
+
+      /*
+      ============================
+      QUIZ / EXAM / INDIVIDUAL
+      ============================
+    */
+
       if (!taskData.questions?.length) {
         await conn.commit();
         return taskId;
       }
 
-      // Batch insert questions
       const questionRows = taskData.questions.map((q, idx) => [
         taskId,
         q.question_type,
         q.question,
-        q.identification_answer,
+        q.identification_answer || null,
         q.point,
-        idx + 1, // position
+        idx + 1,
       ]);
 
-      const questionResult = await conn.query(
-        `INSERT INTO task_questions (task_id, question_type, question, identification_answer, point, position) VALUES ?`,
+      const [questionResult] = await conn.query(
+        `INSERT INTO task_questions
+      (task_id, question_type, question, identification_answer, point, position)
+      VALUES ?`,
         [questionRows],
       );
 
-      const firstQuestionId = questionResult[0].insertId;
+      const firstQuestionId = questionResult.insertId;
+
       const questionIds = taskData.questions.map(
         (_, idx) => firstQuestionId + idx,
       );
 
-      // Batch insert choices (MCQ)
       const choiceRows = [];
+
       taskData.questions.forEach((q, qIdx) => {
         if (
           (q.question_type === "mcq" || q.question_type === "true-false") &&
-          Array.isArray(q.choices) &&
-          q.choices.length > 0
+          Array.isArray(q.choices)
         ) {
           const questionId = questionIds[qIdx];
+
           q.choices.forEach((c) => {
             choiceRows.push([
               questionId,
@@ -86,7 +125,9 @@ class Task {
 
       if (choiceRows.length) {
         await conn.query(
-          `INSERT INTO task_choices (question_id, letter_identifier, choice_answer, is_right_answer) VALUES ?`,
+          `INSERT INTO task_choices
+        (question_id, letter_identifier, choice_answer, is_right_answer)
+        VALUES ?`,
           [choiceRows],
         );
       }

@@ -106,9 +106,12 @@ class AccountController {
       // 5️⃣ Set cookies (cross-site safe)
       const cookieOptions = {
         httpOnly: true,
-        secure: true, // must be true in production
-        sameSite: "None", // cross-site OAuth popup
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
+        path: "/",
       };
+
+      console.log(cookieOptions);
 
       res.cookie("accessToken", accessToken, {
         ...cookieOptions,
@@ -120,6 +123,8 @@ class AccountController {
       });
 
       // 6️⃣ Send HTML to popup to postMessage and close
+
+      console.log("SENDING TO FRONTENDDDD");
       res.send(`
       <html>
         <body>
@@ -131,7 +136,7 @@ class AccountController {
                 needsOnboarding: ${needsOnboarding},
                 token: "${tempToken || ""}"
               },
-              "${process.env.CLIENT_URL}"
+              "${process.env.NODE_ENV === "production" ? process.env.CLIENT_URL : "http://localhost:5173"}"
             );
             window.close();
           </script>
@@ -146,7 +151,7 @@ class AccountController {
           <script>
             window.opener.postMessage(
               { type: "OAUTH_ERROR", error: "${err.message}" },
-              "${process.env.CLIENT_URL}"
+              "${process.env.NODE_ENV === "production" ? process.env.CLIENT_URL : "http://localhost:5173"}"
             );
             window.close();
           </script>

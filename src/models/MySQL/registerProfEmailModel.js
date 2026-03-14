@@ -12,33 +12,102 @@ class RegisteredProfEmail {
 
 
   // Email Template
-  getEmailTemplate() {
+  getEmailTemplate(email) {
     return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    padding: 30px; border-radius: 10px; text-align: center; color: white;">
-          <h1 style="margin: 0; font-size: 28px;">Welcome to Immaculearn!</h1>
-        </div>
+      <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,sans-serif;">
 
-        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; margin-top: 20px;">
-          <h2 style="color: #333;">You are Invited!</h2>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:20px 0;">
+<tr>
+<td align="center">
 
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Your email has been successfully registered to Immaculearn.
-            We're excited to have you join our learning community!
-            Please click the link below
-            <a href="https://immaculearn-online.netlify.app" style="color: #667eea; text-decoration: none;">Access Account</a>
-          </p>
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;">
 
-          <div style="background:#e8f5e8;padding:15px;border-left:4px solid #28a745;margin-top:20px">
-            <b style="color:#155724">🎉 You're now part of our educational platform!</b>
-          </div>
-        </div>
+<!-- HEADER -->
+<tr>
+<td align="center" style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;color:white;">
+<h1 style="margin:0;font-size:26px;">Welcome to Immaculearn!</h1>
+</td>
+</tr>
 
-        <div style="text-align:center;margin-top:20px;color:#999;font-size:14px">
-          Best regards,<br>The Immaculearn Team
-        </div>
-      </div>
+<!-- CONTENT -->
+<tr>
+<td style="padding:30px;">
+
+<h2 style="margin-top:0;color:#333;">You are Invited!</h2>
+
+<p style="color:#666;font-size:16px;line-height:1.6;">
+Dear Immaculearn User: <b>${email}</b>,<br><br>
+Your Gmail has been successfully added to the <b>Immaculearn System</b>.
+Please follow the steps below to start using your account.
+</p>
+
+<!-- STEP 1 -->
+<table width="100%" style="margin-top:20px;background:#f5f6fa;border-radius:8px;">
+<tr>
+<td width="50" align="center" style="padding:20px;">
+<div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+1
+</div>
+</td>
+
+<td style="padding:20px 20px 20px 0;">
+<b style="color:#333;">Access Your Account</b><br>
+<span style="color:#666;font-size:14px;">
+Click the link below to start using the platform.
+</span>
+
+<br><br>
+
+<a href="https://immaculearn-web.up.railway.app"
+style="background:#667eea;color:white;padding:10px 20px;
+text-decoration:none;border-radius:6px;display:inline-block;">
+Open Immaculearn
+</a>
+
+</td>
+</tr>
+</table>
+
+<!-- STEP 2 -->
+<table width="100%" style="margin-top:15px;background:#f5f6fa;border-radius:8px;">
+<tr>
+<td width="50" align="center" style="padding:20px;">
+<div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+2
+</div>
+</td>
+
+<td style="padding:20px 20px 20px 0;">
+<b style="color:#333;">Complete Your Profile</b><br>
+<span style="color:#666;font-size:14px;">
+Click <b>Continue with Gmail</b> and complete your professor profile by filling in your name,
+department, and other required information.
+</span>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+
+</table>
+
+<!-- FOOTER -->
+<table width="600" style="max-width:600px;margin-top:20px;text-align:center;color:#999;font-size:14px;">
+<tr>
+<td>
+Best regards,<br>
+<b>The Immaculearn Team</b><br><br>
+© 2025 Immaculearn. All rights reserved.
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
     `;
   }
 
@@ -170,7 +239,7 @@ class RegisteredProfEmail {
           this.transporter.sendMail({
             to: email,
             subject: "Immaculearn Registration",
-            html: this.getEmailTemplate()
+            html: this.getEmailTemplate(email)
           })
         )
       );

@@ -605,6 +605,10 @@ class SpaceController {
           message: "Space UUID and email are required.",
         });
       }
+
+      // Handle both single email and comma-separated multiple emails
+      const emails = email.includes(',') ? email.split(',').map(e => e.trim()) : [email];
+      
       let space;
 
       space = await this.space.getBySpaceUuid(space_uuid);
@@ -620,21 +624,6 @@ class SpaceController {
         });
       }
 
-      const isVerified = await this.user.findByEmail(email);
-
-      if (!isVerified)
-        return res
-          .status(401)
-          .json({ success: false, message: "Email not Verified" });
-
-      if (isVerified.role === "professor")
-        return res.status(400).json({
-          success: false,
-          message: "You can't invite Professor in Space.",
-        });
-
-      // console.log(verifiedEmail);
-
       // Only owner can invite
       if (space[0].created_by !== owner_id) {
         return res.json({
@@ -643,26 +632,53 @@ class SpaceController {
         });
       }
 
-      const response = await this.space.inviteUserByEmail(
-        owner_id,
-        space[0].space_id,
-        email,
-      );
+      const results = [];
+      const io = getIO();
 
-      if (response) {
-        const io = getIO();
-        if (io) {
-          io.emit("add-by-owner", {
-            space_id: space[0].space_id,
-            email: isVerified?.email,
-          });
+      for (const singleEmail of emails) {
+        try {
+          const isVerified = await this.user.findByEmail(singleEmail);
+
+          if (!isVerified) {
+            results.push({ email: singleEmail, status: 'failed', message: 'Email not Verified' });
+            continue;
+          }
+
+          if (isVerified.role === "professor") {
+            results.push({ email: singleEmail, status: 'failed', message: "You can't invite Professor in Space." });
+            continue;
+          }
+
+          const response = await this.space.inviteUserByEmail(
+            owner_id,
+            space[0].space_id,
+            singleEmail,
+          );
+
+          if (response) {
+            results.push({ email: singleEmail, status: 'success', message: 'Invitation sent successfully' });
+            
+            if (io) {
+              io.emit("add-by-owner", {
+                space_id: space[0].space_id,
+                email: isVerified?.email,
+              });
+            }
+          } else {
+            results.push({ email: singleEmail, status: 'failed', message: 'Failed to send invitation' });
+          }
+        } catch (err) {
+          results.push({ email: singleEmail, status: 'failed', message: err.message });
         }
       }
-      // Emit WebSocket event for space invitation update
+
+      const successCount = results.filter(r => r.status === 'success').length;
+      const failedCount = results.filter(r => r.status === 'failed').length;
 
       return res.json({
-        success: true,
-        message: "Invitation sent successfully.",
+        success: successCount > 0,
+        message: `Processed ${emails.length} emails. ${successCount} successful, ${failedCount} failed.`,
+        results: results,
       });
     } catch (err) {
       return res.json({
@@ -671,7 +687,6 @@ class SpaceController {
       });
     }
   }
-
   async get_space_by_id(req, res) {
     try {
       const token =

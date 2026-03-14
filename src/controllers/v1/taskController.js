@@ -61,6 +61,8 @@ export class TaskController {
       }
 
       // Call model to insert task + questions + choices
+
+      console.log(JSON.stringify(taskData));
       const taskId = await this.task.createTask(taskData, space_id, c_space_id);
 
       res.json({

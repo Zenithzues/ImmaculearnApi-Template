@@ -60,13 +60,12 @@ initSocketIO(io);
 const wss = new WebSocketServer({ noServer: true });
 
 server.on("upgrade", (req, socket, head) => {
-  if (!req.url || !req.url.startsWith("/crdt")) {
-    return;
+  console.log(req.url);
+  if (req.url.startsWith("/crdt")) {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      handleCRDTConnection(ws, req);
+    });
   }
-
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    handleCRDTConnection(ws, req);
-  });
 });
 
 /* ================= START SERVER ================= */

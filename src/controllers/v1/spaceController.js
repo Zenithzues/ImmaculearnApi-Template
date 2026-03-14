@@ -41,7 +41,7 @@ class SpaceController {
         space_name,
         space_description,
         space_cover,
-        space_settings
+        space_settings,
       });
 
       const account_id = res.locals.account_id;
@@ -1321,13 +1321,18 @@ class SpaceController {
     }
   }
 
-
-
   async update_space(req, res) {
     try {
       const account_id = res.locals.account_id;
       const space_uuid = req.params.space_uuid;
-      const { space_name, space_description, space_day, space_time_start, space_time_end, space_yr_lvl } = req.body;
+      const {
+        space_name,
+        space_description,
+        space_day,
+        space_time_start,
+        space_time_end,
+        space_yr_lvl,
+      } = req.body;
 
       if (!account_id)
         return res
@@ -1341,7 +1346,14 @@ class SpaceController {
         });
       }
 
-      const result = await this.space.updateSpace(account_id, space_uuid, { space_name, space_description, space_day, space_time_start, space_time_end, space_yr_lvl });
+      const result = await this.space.updateSpace(account_id, space_uuid, {
+        space_name,
+        space_description,
+        space_day,
+        space_time_start,
+        space_time_end,
+        space_yr_lvl,
+      });
 
       if (!result) {
         return res.status(404).json({

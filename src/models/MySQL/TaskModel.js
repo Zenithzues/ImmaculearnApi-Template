@@ -57,13 +57,35 @@ class Task {
     */
       if (taskData.task_category === "group-activity") {
         if (Array.isArray(taskData.groups) && taskData.groups.length) {
+          // Insert groups
           const groupRows = taskData.groups.map((g) => [taskId, g.group_name]);
-
-          await conn.query(
-            `INSERT INTO task_groups (task_id, group_name)
-           VALUES ?`,
+          const [groupResult] = await conn.query(
+            `INSERT INTO task_groups (task_id, group_name) VALUES ?`,
             [groupRows],
           );
+
+          // Get the inserted group IDs
+          const insertedGroupIds = [];
+          let currentId = groupResult.insertId;
+          for (let i = 0; i < taskData.groups.length; i++) {
+            insertedGroupIds.push(currentId + i);
+          }
+
+          // Insert group members
+          const memberRows = [];
+          taskData.groups.forEach((g, idx) => {
+            const groupId = insertedGroupIds[idx];
+            g.members.forEach((m) => {
+              memberRows.push([groupId, m.account_id, m.role]);
+            });
+          });
+
+          if (memberRows.length) {
+            await conn.query(
+              `INSERT INTO task_group_members (group_id, account_id, member_role) VALUES ?`,
+              [memberRows],
+            );
+          }
         }
 
         await conn.commit();

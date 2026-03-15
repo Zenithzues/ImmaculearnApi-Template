@@ -814,6 +814,7 @@ class SpaceController {
         space_time_start: item.c_space_time_start,
         space_time_end: item.c_space_time_end,
         space_yr_lvl: item.c_space_yr_lvl,
+        space_section: item.c_space_section,
         academic_term: item.acad_term_name,
         academic_semester: item.semester,
         // space_description: item.description,

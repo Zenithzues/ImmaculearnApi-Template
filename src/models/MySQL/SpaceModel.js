@@ -996,6 +996,7 @@ class Space {
             csp.c_space_time_start,
             csp.c_space_time_end,
             csp.c_space_yr_lvl,
+            csp.c_space_section,
             csp.created_by,
             CONCAT(
               '{"name":"', creator_prof.prof_fn, ' ', creator_prof.prof_ln,

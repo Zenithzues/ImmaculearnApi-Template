@@ -607,8 +607,10 @@ class SpaceController {
       }
 
       // Handle both single email and comma-separated multiple emails
-      const emails = email.includes(',') ? email.split(',').map(e => e.trim()) : [email];
-      
+      const emails = email.includes(",")
+        ? email.split(",").map((e) => e.trim().toLowerCase())
+        : [email.trim().toLowerCase()];
+
       let space;
 
       space = await this.space.getBySpaceUuid(space_uuid);
@@ -640,12 +642,20 @@ class SpaceController {
           const isVerified = await this.user.findByEmail(singleEmail);
 
           if (!isVerified) {
-            results.push({ email: singleEmail, status: 'failed', message: 'Email not Verified' });
+            results.push({
+              email: singleEmail,
+              status: "failed",
+              message: "Email not Verified",
+            });
             continue;
           }
 
           if (isVerified.role === "professor") {
-            results.push({ email: singleEmail, status: 'failed', message: "You can't invite Professor in Space." });
+            results.push({
+              email: singleEmail,
+              status: "failed",
+              message: "You can't invite Professor in Space.",
+            });
             continue;
           }
 
@@ -656,8 +666,12 @@ class SpaceController {
           );
 
           if (response) {
-            results.push({ email: singleEmail, status: 'success', message: 'Invitation sent successfully' });
-            
+            results.push({
+              email: singleEmail,
+              status: "success",
+              message: "Invitation sent successfully",
+            });
+
             if (io) {
               io.emit("add-by-owner", {
                 space_id: space[0].space_id,
@@ -665,15 +679,23 @@ class SpaceController {
               });
             }
           } else {
-            results.push({ email: singleEmail, status: 'failed', message: 'Failed to send invitation' });
+            results.push({
+              email: singleEmail,
+              status: "failed",
+              message: "Failed to send invitation",
+            });
           }
         } catch (err) {
-          results.push({ email: singleEmail, status: 'failed', message: err.message });
+          results.push({
+            email: singleEmail,
+            status: "failed",
+            message: err.message,
+          });
         }
       }
 
-      const successCount = results.filter(r => r.status === 'success').length;
-      const failedCount = results.filter(r => r.status === 'failed').length;
+      const successCount = results.filter((r) => r.status === "success").length;
+      const failedCount = results.filter((r) => r.status === "failed").length;
 
       return res.json({
         success: successCount > 0,

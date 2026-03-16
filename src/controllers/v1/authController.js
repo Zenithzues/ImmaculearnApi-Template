@@ -537,7 +537,6 @@ export class AuthController {
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Strict",
         //sameSite: "None",
-        //sameSite: "None",
         maxAge: 15 * 60 * 1000,
       });
 

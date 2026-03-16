@@ -16,98 +16,98 @@ class RegisteredProfEmail {
     return `
       <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,sans-serif;">
 
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:20px 0;">
-<tr>
-<td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:20px 0;">
+      <tr>
+      <td align="center">
 
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;">
 
-<!-- HEADER -->
-<tr>
-<td align="center" style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;color:white;">
-<h1 style="margin:0;font-size:26px;">Welcome to Immaculearn!</h1>
-</td>
-</tr>
+      <!-- HEADER -->
+      <tr>
+      <td align="center" style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;color:white;">
+      <h1 style="margin:0;font-size:26px;">Welcome to Immaculearn!</h1>
+      </td>
+      </tr>
 
-<!-- CONTENT -->
-<tr>
-<td style="padding:30px;">
+      <!-- CONTENT -->
+      <tr>
+      <td style="padding:30px;">
 
-<h2 style="margin-top:0;color:#333;">You are Invited!</h2>
+      <h2 style="margin-top:0;color:#333;">You are Invited!</h2>
 
-<p style="color:#666;font-size:16px;line-height:1.6;">
-Dear Immaculearn User: <b>${email}</b>,<br><br>
-Your Gmail has been successfully added to the <b>Immaculearn System</b>.
-Please follow the steps below to start using your account.
-</p>
+      <p style="color:#666;font-size:16px;line-height:1.6;">
+      Dear Immaculearn User: <b>${email}</b>,<br><br>
+      Your Gmail has been successfully added to the <b>Immaculearn System</b>.
+      Please follow the steps below to start using your account.
+      </p>
 
-<!-- STEP 1 -->
-<table width="100%" style="margin-top:20px;background:#f5f6fa;border-radius:8px;">
-<tr>
-<td width="50" align="center" style="padding:20px;">
-<div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
-1
-</div>
-</td>
+      <!-- STEP 1 -->
+      <table width="100%" style="margin-top:20px;background:#f5f6fa;border-radius:8px;">
+      <tr>
+      <td width="50" align="center" style="padding:20px;">
+      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+      1
+      </div>
+      </td>
 
-<td style="padding:20px 20px 20px 0;">
-<b style="color:#333;">Access Your Account</b><br>
-<span style="color:#666;font-size:14px;">
-Click the link below to start using the platform.
-</span>
+      <td style="padding:20px 20px 20px 0;">
+      <b style="color:#333;">Access Your Account</b><br>
+      <span style="color:#666;font-size:14px;">
+      Click the link below to start using the platform.
+      </span>
 
-<br><br>
+      <br><br>
 
-<a href="https://immaculearn-web.up.railway.app"
-style="background:#667eea;color:white;padding:10px 20px;
-text-decoration:none;border-radius:6px;display:inline-block;">
-Open Immaculearn
-</a>
+      <a href="https://immaculearn-web.up.railway.app"
+      style="background:#667eea;color:white;padding:10px 20px;
+      text-decoration:none;border-radius:6px;display:inline-block;">
+      Open Immaculearn
+      </a>
 
-</td>
-</tr>
-</table>
+      </td>
+      </tr>
+      </table>
 
-<!-- STEP 2 -->
-<table width="100%" style="margin-top:15px;background:#f5f6fa;border-radius:8px;">
-<tr>
-<td width="50" align="center" style="padding:20px;">
-<div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
-2
-</div>
-</td>
+      <!-- STEP 2 -->
+      <table width="100%" style="margin-top:15px;background:#f5f6fa;border-radius:8px;">
+      <tr>
+      <td width="50" align="center" style="padding:20px;">
+      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+      2
+      </div>
+      </td>
 
-<td style="padding:20px 20px 20px 0;">
-<b style="color:#333;">Complete Your Profile</b><br>
-<span style="color:#666;font-size:14px;">
-Click <b>Continue with Gmail</b> and complete your professor profile by filling in your name,
-department, and other required information.
-</span>
-</td>
-</tr>
-</table>
+      <td style="padding:20px 20px 20px 0;">
+      <b style="color:#333;">Complete Your Profile</b><br>
+      <span style="color:#666;font-size:14px;">
+      Click <b>Continue with Gmail</b> and complete your professor profile by filling in your name,
+      department, and other required information.
+      </span>
+      </td>
+      </tr>
+      </table>
 
-</td>
-</tr>
+      </td>
+      </tr>
 
-</table>
+      </table>
 
-<!-- FOOTER -->
-<table width="600" style="max-width:600px;margin-top:20px;text-align:center;color:#999;font-size:14px;">
-<tr>
-<td>
-Best regards,<br>
-<b>The Immaculearn Team</b><br><br>
-© 2025 Immaculearn. All rights reserved.
-</td>
-</tr>
-</table>
+      <!-- FOOTER -->
+      <table width="600" style="max-width:600px;margin-top:20px;text-align:center;color:#999;font-size:14px;">
+      <tr>
+      <td>
+      Best regards,<br>
+      <b>The Immaculearn Team</b><br><br>
+      © 2025 Immaculearn. All rights reserved.
+      </td>
+      </tr>
+      </table>
 
-</td>
-</tr>
-</table>
+      </td>
+      </tr>
+      </table>
 
-</body>
+      </body>
     `;
   }
 
@@ -132,15 +132,16 @@ Best regards,<br>
       return { inserted: 0 };
     }
 
-    // 0️⃣ Check if any emails are already registered as professors
-    const professorEmails = [];
-    for (const email of uniqueEmails) {
-      const user = await this.userModel.findByEmail(email);
-      if (user && user.role === "professor") {
-        professorEmails.push(email);
-      }
-    }
-
+    // 0️⃣ BULK Check if any emails are already registered as professors
+    const placeholders = uniqueEmails.map(() => "?").join(",");
+    
+    const [professorRows] = await this.db.execute(
+      `SELECT email FROM accounts WHERE email IN (${placeholders}) AND role = 'professor'`,
+      uniqueEmails
+    );
+    
+    const professorEmails = professorRows.map(r => r.email);
+    
     if (professorEmails.length > 0) {
       return {
         inserted: 0,
@@ -152,14 +153,13 @@ Best regards,<br>
       };
     }
 
-    // 0️⃣ Check if any emails are already registered as students
-    const placeholders = uniqueEmails.map(() => "?").join(",");
-    const [studentEmailRows] = await this.db.execute(
+    // 0️⃣ BULK Check if any emails are already registered as students
+    const [studentRows] = await this.db.execute(
       `SELECT email FROM registered_student_emails WHERE email IN (${placeholders})`,
       uniqueEmails
     );
     
-    const studentEmails = studentEmailRows.map(r => r.email);
+    const studentEmails = studentRows.map(r => r.email);
     
     if (studentEmails.length > 0) {
       return {
@@ -172,9 +172,7 @@ Best regards,<br>
       };
     }
 
-    // 1️⃣ Check ALL emails (existing and new) for complete profiles
-    const placeholdersForProfiles = uniqueEmails.map(() => "?").join(",");
-
+    // 1️⃣ BULK Check ALL emails for complete professor profiles
     const [profileRows] = await this.db.execute(
       `SELECT 
         a.email,
@@ -184,7 +182,7 @@ Best regards,<br>
         s.prof_department
       FROM accounts a
       LEFT JOIN professors s ON s.account_id = a.account_id
-      WHERE a.email IN (${placeholdersForProfiles})`,
+      WHERE a.email IN (${placeholders})`,
       uniqueEmails
     );
 
@@ -198,9 +196,9 @@ Best regards,<br>
       )
       .map(row => row.email);
 
-    // 2️⃣ Find existing registered emails
+    // 2️⃣ BULK Find existing registered emails
     const [existingRows] = await this.db.execute(
-      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholdersForProfiles})`,
+      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholders})`,
       uniqueEmails
     );
 
@@ -216,7 +214,7 @@ Best regards,<br>
       email => !usersWithCompleteProfiles.includes(email)
     );
 
-    // 3️⃣ Bulk insert new emails
+    // 5️⃣ Bulk insert new emails
     let insertedCount = 0;
 
     if (newEmails.length) {
@@ -228,15 +226,15 @@ Best regards,<br>
       `;
 
       const [result] = await this.db.query(sql, [values]);
-
       insertedCount = result.affectedRows;
     }
 
-    // 4️⃣ Send emails only to those with incomplete profiles
+    // 6️⃣ Send emails only to those with incomplete profiles
     if (emailsToSend.length) {
       await Promise.all(
         emailsToSend.map(email =>
           this.transporter.sendMail({
+            from: process.env.BREVO_GMAIL || 'immaculearn@gmail.com',
             to: email,
             subject: "Immaculearn Registration",
             html: this.getEmailTemplate(email)

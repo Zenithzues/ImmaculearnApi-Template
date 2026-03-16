@@ -1456,7 +1456,7 @@ class Space {
       } else {
         // Insert new remark
         await connection.execute(
-          `INSERT INTO remarks (acad_term_id, c_space_id, prof_id, account_id, prelim, midterm, prefinals, finals, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          `INSERT INTO remarks (acad_term_id, c_space_id, prof_id, account_id, prelim, midterm, prefinals, finals, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             acad_term_id,
             c_space_id,

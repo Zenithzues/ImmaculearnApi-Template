@@ -998,34 +998,32 @@ class Space {
             csp.c_space_yr_lvl,
             csp.c_space_section,
             csp.created_by,
-            CONCAT(
-              '{"name":"', creator_prof.prof_fn, ' ', creator_prof.prof_ln,
-              '","avatar":"', IFNULL(creator_acc.profile_pic, ''), '"}'
+            JSON_OBJECT(
+                'name', CONCAT(creator_prof.prof_fn, ' ', creator_prof.prof_ln),
+                'avatar', IFNULL(creator_acc.profile_pic, '')
             ) AS professor,
-            CONCAT('[', 
-                GROUP_CONCAT(
-                    CONCAT(
-                        '{"account_id":', acc.account_id,
-                        '","profile_pic":"', IFNULL(acc.profile_pic, ''),
-                        '","full_name":"', IFNULL(
+            IFNULL(
+                JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'account_id', acc.account_id,
+                        'profile_pic', IFNULL(acc.profile_pic, ''),
+                        'full_name', IFNULL(
                             COALESCE(
                                 CONCAT(st.student_fn, ' ', st.student_ln),
                                 CONCAT(pr.prof_fn, ' ', pr.prof_ln)
                             ), ''
                         ),
-                        '","role":"', CASE 
+                        'role', CASE 
                             WHEN acc.account_id = csp.created_by THEN 'creator'
                             WHEN st.account_id IS NOT NULL THEN 'student'
                             ELSE 'professor'
-                        END,
-                        '"}'
+                        END
                     )
-                    SEPARATOR ','
-                ), 
-            ']') AS members,
+                ),
+                JSON_ARRAY()
+            ) AS members,
             at.acad_term_name,
             at.semester
-
         FROM course_spaces csp
         LEFT JOIN space_members spm
             ON csp.c_space_id = spm.c_space_id 
@@ -1042,46 +1040,48 @@ class Space {
             ON creator_acc.account_id = csp.created_by
         LEFT JOIN academic_term at
             ON csp.acad_term_id = at.acad_term_id
-        WHERE csp.is_archive = 0 AND EXISTS (
-              SELECT 1 
-              FROM professors p 
-              WHERE p.account_id = csp.created_by
-          )
-          AND NOT EXISTS (
-              SELECT 1
-              FROM space_members sm
-              INNER JOIN professors p2 
-                  ON sm.account_id = p2.account_id
-              WHERE sm.c_space_id = csp.c_space_id
-                AND sm.status = 'accepted'
-                AND sm.account_id != csp.created_by
-          )
-          AND (
+        WHERE csp.is_archive = 0 
+            AND EXISTS (
+                SELECT 1 
+                FROM professors p 
+                WHERE p.account_id = csp.created_by
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM space_members sm
+                INNER JOIN professors p2 
+                    ON sm.account_id = p2.account_id
+                WHERE sm.c_space_id = csp.c_space_id
+                    AND sm.status = 'accepted'
+                    AND sm.account_id != csp.created_by
+            )
+            AND (
                 csp.created_by = ?
                 OR EXISTS (
                     SELECT 1
                     FROM space_members sm2
                     WHERE sm2.c_space_id = csp.c_space_id
-                    AND sm2.account_id = ?
-                    AND sm2.status = 'accepted'
+                        AND sm2.account_id = ?
+                        AND sm2.status = 'accepted'
                 )
             )
         GROUP BY
-          csp.c_space_id,
-          csp.c_space_uuid,
-          csp.c_space_name,
-          csp.c_space_description,
-          csp.c_space_cover,
-          csp.c_space_day,
-          csp.c_space_time_start,
-          csp.c_space_time_end,
-          csp.c_space_yr_lvl,
-          csp.created_by,
-          at.acad_term_name,
-          at.semester,
-          creator_prof.prof_fn,
-          creator_prof.prof_ln,
-          creator_acc.profile_pic
+            csp.c_space_id,
+            csp.c_space_uuid,
+            csp.c_space_name,
+            csp.c_space_description,
+            csp.c_space_cover,
+            csp.c_space_day,
+            csp.c_space_time_start,
+            csp.c_space_time_end,
+            csp.c_space_yr_lvl,
+            csp.c_space_section,
+            csp.created_by,
+            at.acad_term_name,
+            at.semester,
+            creator_prof.prof_fn,
+            creator_prof.prof_ln,
+            creator_acc.profile_pic
         ORDER BY csp.created_at DESC;
         `,
         [account_id, account_id],

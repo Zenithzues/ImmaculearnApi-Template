@@ -1087,20 +1087,17 @@ class Space {
         [account_id, account_id],
       );
 
-      // Safely parse the members JSON string into actual array
+      // No need to parse - the values are already objects
+      // But we should ensure they have the expected structure
       rows.forEach((space) => {
-        try {
-          const membersStr = space.members || "[]";
-          const profStr = space.professor || "[]";
-          space.members = JSON.parse(membersStr);
-          space.professor = JSON.parse(profStr);
-        } catch (e) {
+        // Ensure members is an array
+        if (!space.members || !Array.isArray(space.members)) {
           space.members = [];
-          this.logger.warn("Failed to parse members JSON", {
-            space_id: space.c_space_id,
-            raw: space.members,
-            error: e.message,
-          });
+        }
+
+        // Ensure professor is an object with expected properties
+        if (!space.professor || typeof space.professor !== "object") {
+          space.professor = { name: "", avatar: "" };
         }
       });
 

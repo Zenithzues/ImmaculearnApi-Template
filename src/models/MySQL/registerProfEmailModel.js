@@ -136,7 +136,7 @@ class RegisteredProfEmail {
     const placeholders = uniqueEmails.map(() => "?").join(",");
     
     const [professorRows] = await this.db.execute(
-      `SELECT email FROM accounts WHERE email IN (${placeholders}) AND role = 'professor'`,
+      `SELECT email FROM accounts WHERE email IN (${placeholders})`,
       uniqueEmails
     );
     

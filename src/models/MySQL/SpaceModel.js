@@ -1006,7 +1006,6 @@ class Space {
                 GROUP_CONCAT(
                     CONCAT(
                         '{"account_id":', acc.account_id,
-                        ',"email":"', IFNULL(acc.email, ''),
                         '","profile_pic":"', IFNULL(acc.profile_pic, ''),
                         '","full_name":"', IFNULL(
                             COALESCE(
@@ -1014,11 +1013,6 @@ class Space {
                                 CONCAT(pr.prof_fn, ' ', pr.prof_ln)
                             ), ''
                         ),
-                        '","birth_date":"', IFNULL(COALESCE(st.student_bd, pr.prof_bd), ''),
-                        '","gender":"', IFNULL(COALESCE(st.student_gender, pr.prof_gender), ''),
-                        '","course":"', IFNULL(st.student_course, ''),
-                        '","year_level":"', IFNULL(st.student_yr_lvl, ''),
-                        '","department":"', IFNULL(pr.prof_department, ''),
                         '","role":"', CASE 
                             WHEN acc.account_id = csp.created_by THEN 'creator'
                             WHEN st.account_id IS NOT NULL THEN 'student'

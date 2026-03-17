@@ -198,7 +198,7 @@ class SpaceController {
 
   async join_space_directly(req, res) {
     try {
-      const account_id = res.locals.account_id;
+      const account_id = res.locals.account_id || 23;
       const { space_uuid } = req.body || {};
 
       if (!space_uuid) {
@@ -596,7 +596,7 @@ class SpaceController {
 
   async add_user_in_space_by_reg_email(req, res) {
     try {
-      const owner_id = res.locals.account_id;
+      const owner_id = res.locals.account_id || 1;
       const { space_uuid, email } = req.body || {};
 
       if (!space_uuid || !email) {

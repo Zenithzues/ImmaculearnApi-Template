@@ -9,6 +9,7 @@ const connection = mysql.createPool({
 
   // Pool configuration (optional - adjust based on your needs)
   waitForConnections: true,
+  timezone: "Z",
   connectionLimit: 10, // Maximum number of connections in pool
   queueLimit: 0,
   idleTimeout: 60000, // Maximum number of connection requests the pool will queue

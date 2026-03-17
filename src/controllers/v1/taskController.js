@@ -46,8 +46,6 @@ export class TaskController {
       let c_space_id = null;
       let space_id = null;
 
-      console.log(space);
-
       if (space.length > 0) {
         space_id = space[0].space_id; // normal space
       } else {
@@ -62,7 +60,6 @@ export class TaskController {
 
       // Call model to insert task + questions + choices
 
-      console.log(JSON.stringify(taskData));
       const taskId = await this.task.createTask(taskData, space_id, c_space_id);
 
       res.json({
@@ -294,7 +291,6 @@ export class TaskController {
       } else {
         // 2️⃣ Lookup course space
         space = await this.space.getByCourseSpaceUuid(space_uuid);
-        console.log(space);
 
         if (!space || space.length === 0) {
           return res.status(404).json({
@@ -378,8 +374,6 @@ export class TaskController {
         });
       }
 
-      console.log(answers);
-
       const result = await this.task.submitTaskAnswer({
         task_id,
         account_id,
@@ -427,8 +421,6 @@ export class TaskController {
           message: "Missing criteria for task! Try again.",
         });
       }
-
-      console.log(req.body);
 
       const result = await this.task.create(
         space_id,
@@ -591,8 +583,6 @@ export class TaskController {
 
       const taskQuestionAndAnswer =
         await this.task.getQuestionAndAnswerByTaskId(task_id);
-
-      console.log(taskQuestionAndAnswer);
 
       if (!taskQuestionAndAnswer || taskQuestionAndAnswer.length === 0)
         return res.json({

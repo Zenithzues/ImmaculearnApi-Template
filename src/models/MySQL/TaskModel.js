@@ -183,7 +183,12 @@ class Task {
       } = taskData;
 
       const dueDate = due_date
-        ? new Date(due_date).toISOString().slice(0, 19).replace("T", " ")
+        ? new Date(due_date)
+            .toLocaleString("sv-SE", {
+              timeZone: "Asia/Manila",
+              hour12: false,
+            })
+            .replace("T", " ")
         : null;
 
       // Update main task
@@ -858,6 +863,7 @@ class Task {
       ];
 
       const [rows] = await conn.execute(sql, params);
+
       return rows;
     } catch (err) {
       this.logger.error("Error in Task.getAllTasks", err);
@@ -1187,8 +1193,6 @@ class Task {
         INSERT INTO task_group_members (group_id, member_id)
         VALUES (?, ?)
         `;
-
-      console.log(groupsData);
 
       const group_ids = [];
 

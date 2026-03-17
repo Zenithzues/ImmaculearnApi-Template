@@ -22,8 +22,6 @@ export class UserToken {
         [userId, hashedRefresh, expiresAt],
       );
 
-      console.log(result);
-
       this.logger.info("User token created", {
         userId,
         token_id: result.insertId,
@@ -52,8 +50,6 @@ export class UserToken {
         "INSERT INTO tokens (admin_id, refresh_token, expires_at, created_at) VALUES (?, ?, ?, NOW())",
         [admin_id, hashedRefresh, expiresAt],
       );
-
-      console.log(result);
 
       this.logger.info("User token created", {
         admin_id,

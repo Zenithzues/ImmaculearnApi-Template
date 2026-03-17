@@ -1204,7 +1204,6 @@ class Space {
         [account_id, space_uuid],
       );
 
-      console.log(rows);
       return rows;
     } catch (err) {
       this.logger.error("Error getting join requests", { account_id });
@@ -1533,8 +1532,6 @@ class Space {
         },
       }));
 
-      console.log(formatted);
-
       await connection.commit();
       return formatted;
     } catch (err) {
@@ -1613,8 +1610,6 @@ class Space {
 
       if (rows.length > 0) {
         const newState = rows[0].is_archive ? 0 : 1;
-
-        console.log(newState);
 
         await connection.query(
           `UPDATE course_spaces 
@@ -1828,7 +1823,6 @@ class Space {
             account_id,
           ],
         );
-        console.log("DEBUG: Course space update result:", result);
       } else {
         // Check and update regular space
         console.log("DEBUG: Checking for regular space");

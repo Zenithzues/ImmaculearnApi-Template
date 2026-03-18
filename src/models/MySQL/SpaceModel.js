@@ -999,7 +999,7 @@ class Space {
           csp.c_space_section,
           csp.created_by,
 
-          -- ✅ FIXED: Stable professor object
+          -- Professor as JSON object
           MAX(
               JSON_OBJECT(
                   'name', CONCAT(creator_prof.prof_fn, ' ', creator_prof.prof_ln),
@@ -1007,7 +1007,7 @@ class Space {
               )
           ) AS professor,
 
-          -- ✅ FIXED: Clean members (no nulls, no duplicates)
+          -- Members as JSON array (no nulls, no duplicates)
           IFNULL(
               JSON_ARRAYAGG(
                   DISTINCT CASE 
@@ -1111,29 +1111,24 @@ class Space {
         [account_id, account_id],
       );
 
-      // ✅ Extra safety (optional but good practice)
-      rows.forEach((space) => {
-        // Parse members array
-        if (space.members && typeof space.members === "string") {
-          try {
-            space.members = JSON.parse(space.members);
-          } catch {
-            space.members = [];
-          }
-        } else if (!space.members) {
-          space.members = [];
+      // ✅ Parse JSON strings returned from MySQL
+      const parseJSONSafe = (str, defaultValue) => {
+        if (!str) return defaultValue;
+        if (typeof str === "object") return str; // already parsed
+        try {
+          return JSON.parse(str);
+        } catch {
+          return defaultValue;
         }
+      };
 
-        // Parse professor object
-        if (space.professor && typeof space.professor === "string") {
-          try {
-            space.professor = JSON.parse(space.professor);
-          } catch {
-            space.professor = { name: "", avatar: "" };
-          }
-        } else if (!space.professor) {
-          space.professor = { name: "", avatar: "" };
-        }
+      rows.forEach((space) => {
+        // Parse JSON safely
+        space.members = parseJSONSafe(space.members, []).filter(Boolean); // removes nulls
+        space.professor = parseJSONSafe(space.professor, {
+          name: "",
+          avatar: "",
+        });
       });
 
       return rows;

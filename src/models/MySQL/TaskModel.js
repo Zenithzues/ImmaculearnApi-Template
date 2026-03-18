@@ -436,6 +436,63 @@ class Task {
    * @param {number} task_id
    * @returns {Promise<Array>} array of questions with choices and answers
    */
+  async getAllGroupsByTaskId(task_id) {
+    try {
+      const rows = await this.db.execute(
+        `
+      SELECT
+        g.group_id,
+        g.task_id,
+        g.group_name,
+        m.group_member_id,
+        m.account_id,
+        m.member_role,
+        s.student_fn AS student_first_name,
+        s.student_ln AS student_last_name
+      FROM task_groups g
+      LEFT JOIN task_group_members m ON g.group_id = m.group_id
+      LEFT JOIN students s ON m.account_id = s.account_id
+      WHERE g.task_id = ?
+      ORDER BY g.group_id, m.group_member_id
+      `,
+        [task_id],
+      );
+
+      // Transform flat SQL rows into nested groups with members
+      const groupsMap = new Map();
+
+      rows.forEach((row) => {
+        if (!groupsMap.has(row.group_id)) {
+          groupsMap.set(row.group_id, {
+            group_id: row.group_id,
+            group_name: row.group_name,
+            members: [],
+          });
+        }
+
+        if (row.account_id) {
+          groupsMap.get(row.group_id).members.push({
+            student_name: `${row.student_first_name} ${row.student_last_name}`,
+            is_leader: row.member_role === "leader",
+          });
+        }
+      });
+
+      // Convert Map to array
+      const groupsArray = Array.from(groupsMap.values());
+
+      return groupsArray;
+    } catch (err) {
+      this.logger.error("Error in TaskModel.getGroupsNestedByTask", err);
+      throw err;
+    }
+  }
+
+  /**
+   * Fetch all questions with choices and respondents' answers for a task
+   * @param {number} task_id
+   * @returns {Promise<Array>} array of questions with choices and answers
+   */
   async getAllRespondentsByTaskId(task_id) {
     try {
       const result = await this.db.execute(

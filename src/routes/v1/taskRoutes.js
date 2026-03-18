@@ -12,6 +12,11 @@ taskRouter.use(authentication);
 
 taskRouter.post("/", taskController.create_task.bind(taskController));
 taskRouter.patch("/update", taskController.update_task.bind(taskController));
+
+taskRouter.get(
+  "/:task_id/group-activity/groups",
+  taskController.get_all_groups_by_task_id.bind(taskController),
+);
 taskRouter.get(
   "/:space_uuid",
   taskController.get_task_by_space_uuid.bind(taskController),

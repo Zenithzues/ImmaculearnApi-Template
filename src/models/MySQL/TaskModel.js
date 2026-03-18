@@ -436,6 +436,74 @@ class Task {
    * @param {number} task_id
    * @returns {Promise<Array>} array of questions with choices and answers
    */
+  async getGroupByTaskId(task_id, account_id) {
+    try {
+      // ✅ Get the correct group for THIS task
+      const groups = await this.db.execute(
+        `
+      SELECT g.group_id
+      FROM task_groups g
+      INNER JOIN task_group_members m 
+        ON g.group_id = m.group_id
+      WHERE g.task_id = ?
+        AND m.account_id = ?
+      LIMIT 1
+      `,
+        [task_id, account_id],
+      );
+
+      if (groups[0].length === 0) return null;
+
+      const group_id = groups[0].group_id; // ✅ FIXED
+
+      // ✅ Get full group members
+      const rows = await this.db.execute(
+        `
+        SELECT
+          g.group_id,
+          g.group_name,
+          m.group_member_id,
+          m.account_id,
+          m.member_role,
+          s.student_fn AS student_first_name,
+          s.student_ln AS student_last_name
+        FROM task_groups g
+        LEFT JOIN task_group_members m ON g.group_id = m.group_id
+        LEFT JOIN students s ON m.account_id = s.account_id
+        WHERE g.group_id = ?
+        ORDER BY m.group_member_id
+        `,
+        [group_id],
+      );
+
+      // ✅ Transform to SINGLE object (not array)
+      const groupData = {
+        group_id: group_id,
+        group_name: rows[0]?.group_name || "",
+        members: [],
+      };
+
+      rows.forEach((row) => {
+        if (row.account_id) {
+          groupData.members.push({
+            student_name: `${row.student_first_name} ${row.student_last_name}`,
+            is_leader: row.member_role === "leader",
+          });
+        }
+      });
+
+      return groupData; // ✅ return ONE group only
+    } catch (err) {
+      this.logger.error("Error in TaskModel.getGroupsNestedByTask", err);
+      throw err;
+    }
+  }
+
+  /**
+   * Fetch all questions with choices and respondents' answers for a task
+   * @param {number} task_id
+   * @returns {Promise<Array>} array of questions with choices and answers
+   */
   async getAllGroupsByTaskId(task_id) {
     try {
       const rows = await this.db.execute(

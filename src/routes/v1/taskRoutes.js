@@ -18,6 +18,10 @@ taskRouter.get(
   taskController.get_all_groups_by_task_id.bind(taskController),
 );
 taskRouter.get(
+  "/:task_id/group-activity/groups/student",
+  taskController.get_group_by_task_id.bind(taskController),
+);
+taskRouter.get(
   "/:space_uuid",
   taskController.get_task_by_space_uuid.bind(taskController),
 );

@@ -32,19 +32,22 @@ class Task {
     try {
       await conn.beginTransaction();
 
+      // Insert main task
       const [taskResult] = await conn.query(
         `INSERT INTO tasks
-      (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date, task_start, task_end)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           space_id || null,
           c_space_id || null,
           taskData.task_category,
           taskData.task_title,
-          taskData.task_instruction,
-          taskData.lesson_id,
-          taskData.total_score || taskData.task_score,
-          new Date(taskData.due_date),
+          taskData.task_instruction || null,
+          taskData.lesson_id || null,
+          taskData.total_items_score || null,
+          taskData.due_date ? new Date(taskData.due_date) : null,
+          taskData.start_time || null,
+          taskData.end_time || null,
         ],
       );
 
@@ -52,106 +55,78 @@ class Task {
 
       /*
       ============================
-      GROUP ACTIVITY PROCESS
+      TASK QUESTION GROUPS
       ============================
     */
-      if (taskData.task_category === "group-activity") {
-        if (Array.isArray(taskData.groups) && taskData.groups.length) {
-          // Insert groups
-          const groupRows = taskData.groups.map((g) => [taskId, g.group_name]);
+      if (Array.isArray(taskData.task_question_groups)) {
+        for (const group of taskData.task_question_groups) {
+          // Insert the question group
           const [groupResult] = await conn.query(
-            `INSERT INTO task_groups (task_id, group_name) VALUES ?`,
-            [groupRows],
+            `INSERT INTO task_question_groups
+           (task_id, group_lable, group_instruction)
+           VALUES (?, ?, ?)`,
+            [taskId, group.group_label, group.group_instruction || null],
           );
 
-          // Get the inserted group IDs
-          const insertedGroupIds = [];
-          let currentId = groupResult.insertId;
-          for (let i = 0; i < taskData.groups.length; i++) {
-            insertedGroupIds.push(currentId + i);
-          }
+          const groupId = groupResult.insertId;
 
-          // Insert group members
-          const memberRows = [];
-          taskData.groups.forEach((g, idx) => {
-            const groupId = insertedGroupIds[idx];
-            g.members.forEach((m) => {
-              memberRows.push([groupId, m.account_id, m.role]);
-            });
-          });
-
-          if (memberRows.length) {
-            await conn.query(
-              `INSERT INTO task_group_members (group_id, account_id, member_role) VALUES ?`,
-              [memberRows],
-            );
-          }
-        }
-
-        await conn.commit();
-        return taskId;
-      }
-
-      /*
-      ============================
-      QUIZ / EXAM / INDIVIDUAL
-      ============================
-    */
-
-      if (!taskData.questions?.length) {
-        await conn.commit();
-        return taskId;
-      }
-
-      const questionRows = taskData.questions.map((q, idx) => [
-        taskId,
-        q.question_type,
-        q.question,
-        q.identification_answer || null,
-        q.point,
-        idx + 1,
-      ]);
-
-      const [questionResult] = await conn.query(
-        `INSERT INTO task_questions
-      (task_id, question_type, question, identification_answer, point, position)
-      VALUES ?`,
-        [questionRows],
-      );
-
-      const firstQuestionId = questionResult.insertId;
-
-      const questionIds = taskData.questions.map(
-        (_, idx) => firstQuestionId + idx,
-      );
-
-      const choiceRows = [];
-
-      taskData.questions.forEach((q, qIdx) => {
-        if (
-          (q.question_type === "mcq" || q.question_type === "true-false") &&
-          Array.isArray(q.choices)
-        ) {
-          const questionId = questionIds[qIdx];
-
-          q.choices.forEach((c) => {
-            choiceRows.push([
-              questionId,
-              c.letter_identifier,
-              c.choice_answer,
-              c.isRightAnswer,
+          // Insert questions for this group
+          if (Array.isArray(group.group_questions)) {
+            const questionRows = group.group_questions.map((q, idx) => [
+              taskId,
+              groupId,
+              q.question_type,
+              q.question,
+              q.identification_answer || null,
+              q.point || 1,
+              idx + 1,
             ]);
-          });
-        }
-      });
 
-      if (choiceRows.length) {
-        await conn.query(
-          `INSERT INTO task_choices
-        (question_id, letter_identifier, choice_answer, is_right_answer)
-        VALUES ?`,
-          [choiceRows],
-        );
+            const [questionResult] = await conn.query(
+              `INSERT INTO task_questions
+             (task_id, group_id, question_type, question, identification_answer, point, position)
+             VALUES ?`,
+              [questionRows],
+            );
+
+            const firstQuestionId = questionResult.insertId;
+
+            // Compute question IDs for choices
+            const questionIds = group.group_questions.map(
+              (_, idx) => firstQuestionId + idx,
+            );
+
+            // Insert choices
+            const choiceRows = [];
+            group.group_questions.forEach((q, qIdx) => {
+              if (
+                (q.question_type === "mcq" ||
+                  q.question_type === "true-false") &&
+                Array.isArray(q.choices)
+              ) {
+                const questionId = questionIds[qIdx];
+
+                q.choices.forEach((c) => {
+                  choiceRows.push([
+                    questionId,
+                    c.letter_identifier,
+                    c.choice_answer,
+                    c.is_correct ? 1 : 0,
+                  ]);
+                });
+              }
+            });
+
+            if (choiceRows.length) {
+              await conn.query(
+                `INSERT INTO task_choices
+               (question_id, letter_identifier, choice_answer, is_right_answer)
+               VALUES ?`,
+                [choiceRows],
+              );
+            }
+          }
+        }
       }
 
       await conn.commit();
@@ -299,8 +274,100 @@ class Task {
 
   async getQuestionAndAnswerByTaskId(task_id) {
     try {
-      const result = await this.db.execute(
-        `
+      // First, get task_category
+      const taskRows = await this.db.execute(
+        `SELECT task_category FROM tasks WHERE task_id = ?`,
+        [task_id],
+      );
+
+      console.log(taskRows);
+
+      if (taskRows[0].length === 0) return [];
+
+      const taskCategory = taskRows[0].task_category;
+
+      console.log(taskCategory);
+
+      if (taskCategory === "exam") {
+        // New grouped structure for exams
+        const rows = await this.db.execute(
+          `
+        SELECT
+          g.group_id,
+          g.group_lable,
+          g.group_instruction,
+          q.question_id,
+          q.task_id,
+          q.question_type,
+          q.question,
+          q.identification_answer,
+          q.point,
+          q.position,
+          q.expected_count,
+          c.choice_id,
+          c.letter_identifier,
+          c.choice_answer,
+          c.is_right_answer
+        FROM task_questions q
+        LEFT JOIN task_choices c ON q.question_id = c.question_id
+        LEFT JOIN task_question_groups g ON q.group_id = g.group_id
+        WHERE q.task_id = ?
+        ORDER BY g.group_id ASC, q.position ASC, c.letter_identifier ASC
+        `,
+          [task_id],
+        );
+
+        const groups = Object.values(
+          rows.reduce((accGroup, row) => {
+            if (!accGroup[row.group_id]) {
+              accGroup[row.group_id] = {
+                group_id: row.group_id,
+                group_name: row.group_lable,
+                group_instruction: row.group_instruction,
+                questions: [],
+              };
+            }
+
+            const group = accGroup[row.group_id];
+
+            let question = group.questions.find(
+              (q) => q.question_id === row.question_id,
+            );
+            if (!question) {
+              question = {
+                question_id: row.question_id,
+                task_id: row.task_id,
+                question_type: row.question_type,
+                question: row.question,
+                identification_answer: row.identification_answer,
+                point: row.point,
+                position: row.position,
+                expected_count: row.expected_count,
+                choices: [],
+              };
+              group.questions.push(question);
+            }
+
+            if (row.choice_id) {
+              question.choices.push({
+                choice_id: row.choice_id,
+                letter_identifier: row.letter_identifier,
+                choice_answer: row.choice_answer,
+                is_right_answer: row.is_right_answer,
+              });
+            }
+
+            return accGroup;
+          }, {}),
+        );
+
+        console.log(groups);
+
+        return groups;
+      } else {
+        // Old flat structure for non-exams
+        const result = await this.db.execute(
+          `
       SELECT
         q.question_id,
         q.task_id,
@@ -320,43 +387,44 @@ class Task {
       WHERE q.task_id = ?
       ORDER BY q.position ASC, c.letter_identifier ASC
       `,
-        [task_id],
-      );
+          [task_id],
+        );
 
-      const rows = result; // your SQL result
+        const rows = result; // your SQL result
 
-      const questions = Object.values(
-        rows.reduce((acc, row) => {
-          if (!acc[row.question_id]) {
-            acc[row.question_id] = {
-              question_id: row.question_id,
-              task_id: row.task_id,
-              question_type: row.question_type,
-              question: row.question,
-              identification_answer: row.identification_answer,
-              point: row.point,
-              position: row.position,
-              expected_count: row.expected_count,
-              choices: [],
-            };
-          }
+        const questions = Object.values(
+          rows.reduce((acc, row) => {
+            if (!acc[row.question_id]) {
+              acc[row.question_id] = {
+                question_id: row.question_id,
+                task_id: row.task_id,
+                question_type: row.question_type,
+                question: row.question,
+                identification_answer: row.identification_answer,
+                point: row.point,
+                position: row.position,
+                expected_count: row.expected_count,
+                choices: [],
+              };
+            }
 
-          if (row.choice_id) {
-            acc[row.question_id].choices.push({
-              choice_id: row.choice_id,
-              letter_identifier: row.letter_identifier,
-              choice_answer: row.choice_answer,
-              is_right_answer: row.is_right_answer,
-            });
-          }
+            if (row.choice_id) {
+              acc[row.question_id].choices.push({
+                choice_id: row.choice_id,
+                letter_identifier: row.letter_identifier,
+                choice_answer: row.choice_answer,
+                is_right_answer: row.is_right_answer,
+              });
+            }
 
-          return acc;
-        }, {}),
-      );
+            return acc;
+          }, {}),
+        );
 
-      // console.log(questions);
+        // console.log(questions);
 
-      return questions;
+        return questions;
+      }
     } catch (err) {
       this.logger.error("Error in Task.getQuestionAndAnswerByTaskId", err);
       throw err;
@@ -396,6 +464,7 @@ class Task {
         FROM task_questions q
         LEFT JOIN task_choices c
           ON q.question_id = c.question_id
+          AND q.question_type IN ('mcq', 'true-false')
         LEFT JOIN task_answers a
           ON q.question_id = a.question_id
         LEFT JOIN students s
@@ -507,6 +576,7 @@ class Task {
           ON q.task_id = ?
       LEFT JOIN task_choices c
           ON c.question_id = q.question_id
+          AND q.question_type IN ('mcq', 'true-false')
       LEFT JOIN tasks t
           ON t.task_id = q.task_id
       LEFT JOIN (
@@ -632,7 +702,7 @@ class Task {
     }
   }
 
-  async getResponseByStudentIdAndTaskId(account_id, task_id) {
+  async getResponseByStudentIdAndTaskId(student_id, task_id) {
     // Check if all students have completed the task
     const isAllResponseToTask = await this.checkIfAllStudentResponse(task_id);
     if (!isAllResponseToTask) return false;
@@ -671,8 +741,9 @@ class Task {
         AND qs.task_id = a.task_id
     LEFT JOIN task_questions q
         ON q.task_id = ?
-    LEFT JOIN task_choices c
+    LEFT JOIN task_choices c 
         ON c.question_id = q.question_id
+        AND q.question_type IN ('mcq', 'true-false')
     LEFT JOIN tasks t
         ON t.task_id = q.task_id
     LEFT JOIN (
@@ -682,14 +753,10 @@ class Task {
         GROUP BY account_id
     ) totals
         ON totals.account_id = s.account_id
-    WHERE s.account_id IN (
-        SELECT DISTINCT account_id
-        FROM task_answers
-        WHERE task_id = ?
-    )
-    ORDER BY s.account_id, q.position ASC, c.letter_identifier ASC;
+    WHERE s.account_id = ?
+    ORDER BY q.position ASC, c.letter_identifier ASC;
     `,
-      [task_id, task_id, task_id, task_id], // FIXED parameter order
+      [task_id, task_id, task_id, student_id], // FIXED parameter order
     );
 
     const questions = {};
@@ -753,7 +820,16 @@ class Task {
       }
 
       // Map student answers for Identification / Short-Answer
-      if (row.answer_text && row.question_type === "identification") {
+      // if (row.answer_text && row.question_type === "identification") {
+      //   student_answers[row.question_id] = row.answer_text;
+      // }
+
+      console.log(row.answer_text);
+      if (
+        row.question_type === "identification" &&
+        row.answer_text &&
+        student_answers[row.question_id] === undefined
+      ) {
         student_answers[row.question_id] = row.answer_text;
       }
 
@@ -796,6 +872,8 @@ class Task {
           t.lesson_id,
           t.total_items_score,
           t.due_date,
+          t.task_start,
+          t.task_end,
           t.created_at,
           t.updated_at,
 
@@ -900,6 +978,8 @@ class Task {
           t.lesson_id,
           t.total_items_score,
           t.due_date,
+          t.task_start,
+          t.task_end,
           t.created_at,
           t.updated_at,
 
@@ -965,6 +1045,100 @@ class Task {
 
   async getQuestionsByTaskId(task_id) {
     try {
+      // 1. Get task category
+      const taskRows = await this.db.execute(
+        `SELECT task_category FROM tasks WHERE task_id = ?`,
+        [task_id],
+      );
+
+      if (taskRows[0].length === 0) return [];
+
+      const taskCategory = taskRows[0].task_category;
+
+      /*
+    ============================
+    EXAM (GROUPED)
+    ============================
+    */
+      if (taskCategory === "exam") {
+        const sql = `
+        SELECT
+          g.group_id,
+          g.group_lable,
+          g.group_instruction,
+          q.question_id,
+          q.task_id,
+          q.question,
+          q.question_type,
+          q.point,
+          q.position AS order_no,
+          c.choice_id,
+          c.letter_identifier,
+          c.choice_answer
+        FROM task_questions q
+        LEFT JOIN task_choices c
+          ON c.question_id = q.question_id
+        LEFT JOIN task_question_groups g
+          ON q.group_id = g.group_id
+        WHERE q.task_id = ?
+        ORDER BY g.group_id ASC, q.position ASC, c.choice_id ASC
+      `;
+
+        const rows = await this.db.execute(sql, [task_id]);
+
+        const groupMap = {};
+
+        for (const row of rows) {
+          // Create group if not exists
+          if (!groupMap[row.group_id]) {
+            groupMap[row.group_id] = {
+              group_id: row.group_id,
+              group_name: row.group_lable,
+              group_instruction: row.group_instruction,
+              questions: [],
+            };
+          }
+
+          const group = groupMap[row.group_id];
+
+          // Find or create question
+          let question = group.questions.find(
+            (q) => q.question_id === row.question_id,
+          );
+
+          if (!question) {
+            question = {
+              question_id: row.question_id,
+              task_id: row.task_id,
+              question: row.question,
+              question_type: row.question_type,
+              point: row.point,
+              order_no: row.order_no,
+              choices: [],
+            };
+            group.questions.push(question);
+          }
+
+          // Add choices
+          if (row.choice_id) {
+            question.choices.push({
+              choice_id: row.choice_id,
+              letter_identifier: row.letter_identifier,
+              choice_answer: row.choice_answer,
+            });
+          }
+        }
+
+        console.log(Object.values(groupMap));
+
+        return Object.values(groupMap);
+      }
+
+      /*
+    ============================
+    DEFAULT (OLD STRUCTURE)
+    ============================
+    */
       const sql = `
       SELECT
         q.question_id,
@@ -1009,6 +1183,8 @@ class Task {
           });
         }
       }
+
+      // console.log(Object.values(map));
 
       return Object.values(map);
     } catch (err) {

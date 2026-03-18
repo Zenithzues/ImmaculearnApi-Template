@@ -986,117 +986,152 @@ class Space {
     try {
       const rows = await this.db.execute(
         `
-        SELECT 
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_description,
-            csp.c_space_cover,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.c_space_section,
-            csp.created_by,
-            JSON_OBJECT(
-                'name', CONCAT(creator_prof.prof_fn, ' ', creator_prof.prof_ln),
-                'avatar', IFNULL(creator_acc.profile_pic, '')
-            ) AS professor,
-            IFNULL(
-                JSON_ARRAYAGG(
-                    JSON_OBJECT(
-                        'account_id', acc.account_id,
-                        'profile_pic', IFNULL(acc.profile_pic, ''),
-                        'full_name', IFNULL(
-                            COALESCE(
-                                CONCAT(st.student_fn, ' ', st.student_ln),
-                                CONCAT(pr.prof_fn, ' ', pr.prof_ln)
-                            ), ''
-                        ),
-                        'role', CASE 
-                            WHEN acc.account_id = csp.created_by THEN 'creator'
-                            WHEN st.account_id IS NOT NULL THEN 'student'
-                            ELSE 'professor'
-                        END
-                    )
-                ),
-                JSON_ARRAY()
-            ) AS members,
-            at.acad_term_name,
-            at.semester
-        FROM course_spaces csp
-        LEFT JOIN space_members spm
-            ON csp.c_space_id = spm.c_space_id 
-            AND spm.status = 'accepted'
-        LEFT JOIN accounts acc
-            ON acc.account_id = spm.account_id
-        LEFT JOIN students st
-            ON acc.account_id = st.account_id
-        LEFT JOIN professors pr
-            ON acc.account_id = pr.account_id
-        LEFT JOIN professors creator_prof
-            ON creator_prof.account_id = csp.created_by
-        LEFT JOIN accounts creator_acc
-            ON creator_acc.account_id = csp.created_by
-        LEFT JOIN academic_term at
-            ON csp.acad_term_id = at.acad_term_id
-        WHERE csp.is_archive = 0 
-            AND EXISTS (
-                SELECT 1 
-                FROM professors p 
-                WHERE p.account_id = csp.created_by
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM space_members sm
-                INNER JOIN professors p2 
-                    ON sm.account_id = p2.account_id
-                WHERE sm.c_space_id = csp.c_space_id
-                    AND sm.status = 'accepted'
-                    AND sm.account_id != csp.created_by
-            )
-            AND (
-                csp.created_by = ?
-                OR EXISTS (
-                    SELECT 1
-                    FROM space_members sm2
-                    WHERE sm2.c_space_id = csp.c_space_id
-                        AND sm2.account_id = ?
-                        AND sm2.status = 'accepted'
-                )
-            )
-        GROUP BY
-            csp.c_space_id,
-            csp.c_space_uuid,
-            csp.c_space_name,
-            csp.c_space_description,
-            csp.c_space_cover,
-            csp.c_space_day,
-            csp.c_space_time_start,
-            csp.c_space_time_end,
-            csp.c_space_yr_lvl,
-            csp.c_space_section,
-            csp.created_by,
-            at.acad_term_name,
-            at.semester,
-            creator_prof.prof_fn,
-            creator_prof.prof_ln,
-            creator_acc.profile_pic
-        ORDER BY csp.created_at DESC;
-        `,
+      SELECT 
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_description,
+          csp.c_space_cover,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.c_space_section,
+          csp.created_by,
+
+          -- ✅ FIXED: Stable professor object
+          MAX(
+              JSON_OBJECT(
+                  'name', CONCAT(creator_prof.prof_fn, ' ', creator_prof.prof_ln),
+                  'avatar', IFNULL(creator_acc.profile_pic, '')
+              )
+          ) AS professor,
+
+          -- ✅ FIXED: Clean members (no nulls, no duplicates)
+          IFNULL(
+              JSON_ARRAYAGG(
+                  DISTINCT CASE 
+                      WHEN acc.account_id IS NOT NULL THEN
+                          JSON_OBJECT(
+                              'account_id', acc.account_id,
+                              'profile_pic', IFNULL(acc.profile_pic, ''),
+                              'full_name', IFNULL(
+                                  COALESCE(
+                                      CONCAT(st.student_fn, ' ', st.student_ln),
+                                      CONCAT(pr.prof_fn, ' ', pr.prof_ln)
+                                  ), ''
+                              ),
+                              'role', CASE 
+                                  WHEN acc.account_id = csp.created_by THEN 'creator'
+                                  WHEN st.account_id IS NOT NULL THEN 'student'
+                                  ELSE 'professor'
+                              END
+                          )
+                  END
+              ),
+              JSON_ARRAY()
+          ) AS members,
+
+          at.acad_term_name,
+          at.semester
+
+      FROM course_spaces csp
+
+      LEFT JOIN space_members spm
+          ON csp.c_space_id = spm.c_space_id 
+          AND spm.status = 'accepted'
+
+      LEFT JOIN accounts acc
+          ON acc.account_id = spm.account_id
+
+      LEFT JOIN students st
+          ON acc.account_id = st.account_id
+
+      LEFT JOIN professors pr
+          ON acc.account_id = pr.account_id
+
+      LEFT JOIN professors creator_prof
+          ON creator_prof.account_id = csp.created_by
+
+      LEFT JOIN accounts creator_acc
+          ON creator_acc.account_id = csp.created_by
+
+      LEFT JOIN academic_term at
+          ON csp.acad_term_id = at.acad_term_id
+
+      WHERE csp.is_archive = 0 
+
+          -- only spaces created by professors
+          AND EXISTS (
+              SELECT 1 
+              FROM professors p 
+              WHERE p.account_id = csp.created_by
+          )
+
+          -- exclude spaces with other professors
+          AND NOT EXISTS (
+              SELECT 1
+              FROM space_members sm
+              INNER JOIN professors p2 
+                  ON sm.account_id = p2.account_id
+              WHERE sm.c_space_id = csp.c_space_id
+                  AND sm.status = 'accepted'
+                  AND sm.account_id != csp.created_by
+          )
+
+          -- user must be creator OR member
+          AND (
+              csp.created_by = ?
+              OR EXISTS (
+                  SELECT 1
+                  FROM space_members sm2
+                  WHERE sm2.c_space_id = csp.c_space_id
+                      AND sm2.account_id = ?
+                      AND sm2.status = 'accepted'
+              )
+          )
+
+      GROUP BY
+          csp.c_space_id,
+          csp.c_space_uuid,
+          csp.c_space_name,
+          csp.c_space_description,
+          csp.c_space_cover,
+          csp.c_space_day,
+          csp.c_space_time_start,
+          csp.c_space_time_end,
+          csp.c_space_yr_lvl,
+          csp.c_space_section,
+          csp.created_by,
+          at.acad_term_name,
+          at.semester
+
+      ORDER BY csp.created_at DESC;
+      `,
         [account_id, account_id],
       );
 
-      // No need to parse - the values are already objects
-      // But we should ensure they have the expected structure
+      // ✅ Extra safety (optional but good practice)
       rows.forEach((space) => {
-        // Ensure members is an array
-        if (!space.members || !Array.isArray(space.members)) {
+        // Parse members array
+        if (space.members && typeof space.members === "string") {
+          try {
+            space.members = JSON.parse(space.members);
+          } catch {
+            space.members = [];
+          }
+        } else if (!space.members) {
           space.members = [];
         }
 
-        // Ensure professor is an object with expected properties
-        if (!space.professor || typeof space.professor !== "object") {
+        // Parse professor object
+        if (space.professor && typeof space.professor === "string") {
+          try {
+            space.professor = JSON.parse(space.professor);
+          } catch {
+            space.professor = { name: "", avatar: "" };
+          }
+        } else if (!space.professor) {
           space.professor = { name: "", avatar: "" };
         }
       });

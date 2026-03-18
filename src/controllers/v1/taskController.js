@@ -29,7 +29,7 @@ export class TaskController {
       }
 
       const { space_uuid, taskData } = req.body || {};
-      console.log(space_uuid, taskData);
+      // console.log(space_uuid, taskData);
       if (!taskData || !space_uuid) {
         return res.status(400).json({
           success: false,
@@ -37,7 +37,7 @@ export class TaskController {
         });
       }
 
-      if (!taskData.lesson_id)
+      if (!taskData.task_category === "exam" && !taskData.lesson_id)
         return res
           .status(400)
           .json({ success: false, message: "Must have Related Lesson" });
@@ -57,6 +57,9 @@ export class TaskController {
 
         c_space_id = space[0].space_id; // course space
       }
+
+      console.log(taskData);
+      console.log(JSON.stringify(taskData, null, 2));
 
       // Call model to insert task + questions + choices
 

@@ -1030,7 +1030,7 @@ class Space {
                   END
               ),
               JSON_ARRAY()
-          ) AS members
+          ) AS members,
 
           at.acad_term_name,
           at.semester

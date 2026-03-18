@@ -1,11 +1,9 @@
 import { connection } from "../../core/database.js";
-import { transporter } from "../../core/nodeMailer.js";
 import UserModel from "./UserModel.js";
 
 class RegisteredProfEmail {
   constructor() {
     this.db = connection;
-    this.transporter = transporter;
     this.userModel = new UserModel();
     this.logger = console;
   }
@@ -14,13 +12,23 @@ class RegisteredProfEmail {
   // Email Template
   getEmailTemplate(email) {
     return `
+      <html>
+      <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        @media only screen and (max-width: 620px) {
+          .email-wrapper { width: 100% !important; }
+          .email-body { padding: 16px !important; }
+        }
+      </style>
+      </head>
       <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,sans-serif;">
 
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:20px 0;">
       <tr>
       <td align="center">
 
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;">
+      <table class="email-wrapper" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;">
 
       <!-- HEADER -->
       <tr>
@@ -31,7 +39,7 @@ class RegisteredProfEmail {
 
       <!-- CONTENT -->
       <tr>
-      <td style="padding:30px;">
+      <td class="email-body" style="padding:30px;">
 
       <h2 style="margin-top:0;color:#333;">You are Invited!</h2>
 
@@ -44,13 +52,13 @@ class RegisteredProfEmail {
       <!-- STEP 1 -->
       <table width="100%" style="margin-top:20px;background:#f5f6fa;border-radius:8px;">
       <tr>
-      <td width="50" align="center" style="padding:20px;">
-      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+      <td class="step-number" width="50" align="center" style="padding:20px;">
+      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;text-align:center;">
       1
       </div>
       </td>
 
-      <td style="padding:20px 20px 20px 0;">
+      <td style="padding:20px;">
       <b style="color:#333;">Access Your Account</b><br>
       <span style="color:#666;font-size:14px;">
       Click the link below to start using the platform.
@@ -71,13 +79,13 @@ class RegisteredProfEmail {
       <!-- STEP 2 -->
       <table width="100%" style="margin-top:15px;background:#f5f6fa;border-radius:8px;">
       <tr>
-      <td width="50" align="center" style="padding:20px;">
-      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;">
+      <td class="step-number" width="50" align="center" style="padding:20px;">
+      <div style="background:#667eea;color:white;width:32px;height:32px;border-radius:50%;line-height:32px;font-weight:bold;text-align:center;">
       2
       </div>
       </td>
 
-      <td style="padding:20px 20px 20px 0;">
+      <td style="padding:20px;">
       <b style="color:#333;">Complete Your Profile</b><br>
       <span style="color:#666;font-size:14px;">
       Click <b>Continue with Gmail</b> and complete your professor profile by filling in your name,
@@ -93,7 +101,7 @@ class RegisteredProfEmail {
       </table>
 
       <!-- FOOTER -->
-      <table width="600" style="max-width:600px;margin-top:20px;text-align:center;color:#999;font-size:14px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin-top:20px;text-align:center;color:#999;font-size:14px;">
       <tr>
       <td>
       Best regards,<br>
@@ -108,6 +116,7 @@ class RegisteredProfEmail {
       </table>
 
       </body>
+      </html>
     `;
   }
 
@@ -232,14 +241,29 @@ class RegisteredProfEmail {
     // 6️⃣ Send emails only to those with incomplete profiles
     if (emailsToSend.length) {
       await Promise.all(
-        emailsToSend.map(email =>
-          this.transporter.sendMail({
-            from: process.env.BREVO_GMAIL || 'immaculearn@gmail.com',
-            to: email,
-            subject: "Immaculearn Registration",
-            html: this.getEmailTemplate(email)
-          })
-        )
+        emailsToSend.map(async (email) => {
+          const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "api-key": process.env.BREVO_API_KEY
+            },
+            body: JSON.stringify({
+              sender: {
+                name: "Immaculearn",
+                email: "immaculearn@gmail.com"
+              },
+              to: [{ email }],
+              subject: "Immaculearn Registration",
+              htmlContent: this.getEmailTemplate(email)
+            })
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(`Brevo error for ${email}: ${JSON.stringify(err)}`);
+          }
+        })
       );
     }
 

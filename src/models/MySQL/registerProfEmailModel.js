@@ -141,49 +141,31 @@ class RegisteredProfEmail {
       return { inserted: 0 };
     }
 
-    // 0️⃣ BULK Check if any emails are already registered as professors
     const placeholders = uniqueEmails.map(() => "?").join(",");
-    
-    const [professorRows] = await this.db.execute(
-      `SELECT email FROM accounts WHERE email IN (${placeholders})`,
-      uniqueEmails
-    );
-    
-    const professorEmails = professorRows.map(r => r.email);
-    
-    if (professorEmails.length > 0) {
-      return {
-        inserted: 0,
-        skipped: uniqueEmails.length,
-        emailsNotSent: professorEmails.length,
-        professorBlocked: professorEmails,
-        totalProcessed: uniqueEmails.length,
-        message: `${professorEmails.length} email(s) are already registered as professors and cannot be registered as students`
-      };
-    }
 
-    // 0️⃣ BULK Check if any emails are already registered as students
+    // 0️⃣ Skip emails already registered as students — but continue with the rest
     const [studentRows] = await this.db.execute(
       `SELECT email FROM registered_student_emails WHERE email IN (${placeholders})`,
       uniqueEmails
     );
-    
     const studentEmails = studentRows.map(r => r.email);
-    
-    if (studentEmails.length > 0) {
+    const eligibleEmails = uniqueEmails.filter(e => !studentEmails.includes(e));
+
+    if (!eligibleEmails.length) {
       return {
         inserted: 0,
         skipped: uniqueEmails.length,
-        emailsNotSent: studentEmails.length,
-        studentBlocked: studentEmails,
+        skippedEmails: studentEmails,
         totalProcessed: uniqueEmails.length,
-        message: `${studentEmails.length} email(s) are already registered as students and cannot be registered as professors`
+        message: `All emails are already registered as students`
       };
     }
 
-    // 1️⃣ BULK Check ALL emails for complete professor profiles
+    const eligiblePlaceholders = eligibleEmails.map(() => "?").join(",");
+
+    // 1️⃣ BULK Check ALL eligible emails for complete professor profiles
     const [profileRows] = await this.db.execute(
-      `SELECT 
+      `SELECT
         a.email,
         s.prof_fn,
         s.prof_ln,
@@ -191,35 +173,35 @@ class RegisteredProfEmail {
         s.prof_department
       FROM accounts a
       LEFT JOIN professors s ON s.account_id = a.account_id
-      WHERE a.email IN (${placeholders})`,
-      uniqueEmails
+      WHERE a.email IN (${eligiblePlaceholders})`,
+      eligibleEmails
     );
 
     // Check which users have complete profiles
     const usersWithCompleteProfiles = profileRows
-      .filter(row => 
-        row.prof_fn && 
-        row.prof_ln && 
-        row.prof_gender && 
+      .filter(row =>
+        row.prof_fn &&
+        row.prof_ln &&
+        row.prof_gender &&
         row.prof_department
       )
       .map(row => row.email);
 
     // 2️⃣ BULK Find existing registered emails
     const [existingRows] = await this.db.execute(
-      `SELECT email FROM registered_prof_emails WHERE email IN (${placeholders})`,
-      uniqueEmails
+      `SELECT email FROM registered_prof_emails WHERE email IN (${eligiblePlaceholders})`,
+      eligibleEmails
     );
 
     const existingEmails = existingRows.map(r => r.email);
 
     // 3️⃣ Filter new emails
-    const newEmails = uniqueEmails.filter(
+    const newEmails = eligibleEmails.filter(
       email => !existingEmails.includes(email)
     );
 
     // 4️⃣ Filter out users with complete profiles from receiving emails
-    const emailsToSend = uniqueEmails.filter(
+    const emailsToSend = eligibleEmails.filter(
       email => !usersWithCompleteProfiles.includes(email)
     );
 
@@ -270,6 +252,7 @@ class RegisteredProfEmail {
     return {
       inserted: insertedCount,
       skipped: existingEmails.length,
+      skippedAsStudents: studentEmails.length,
       emailsNotSent: usersWithCompleteProfiles.length,
       totalProcessed: uniqueEmails.length
     };

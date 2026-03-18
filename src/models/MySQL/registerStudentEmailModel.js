@@ -140,30 +140,31 @@ class RegisteredEmail {
       return { inserted: 0 };
     }
 
-    // 0️⃣ BULK Check if any emails are already registered as professors
     const placeholders = uniqueEmails.map(() => "?").join(",");
 
+    // 0️⃣ Skip emails already registered as professors — but continue with the rest
     const [profEmailRows] = await this.db.execute(
       `SELECT email FROM registered_prof_emails WHERE email IN (${placeholders})`,
       uniqueEmails
     );
-    
     const profEmails = profEmailRows.map(r => r.email);
-    
-    if (profEmails.length > 0) {
+    const eligibleEmails = uniqueEmails.filter(e => !profEmails.includes(e));
+
+    if (!eligibleEmails.length) {
       return {
         inserted: 0,
         skipped: uniqueEmails.length,
-        emailsNotSent: profEmails.length,
-        professorBlocked: profEmails,
+        skippedEmails: profEmails,
         totalProcessed: uniqueEmails.length,
-        message: `${profEmails.length} email(s) are already registered as professors and cannot be registered as students`
+        message: `All emails are already registered as professors`
       };
     }
 
-    // 1️⃣ BULK Check ALL emails for complete student profiles
+    const eligiblePlaceholders = eligibleEmails.map(() => "?").join(",");
+
+    // 1️⃣ BULK Check ALL eligible emails for complete student profiles
     const [profileRows] = await this.db.execute(
-      `SELECT 
+      `SELECT
         a.email,
         s.student_fn,
         s.student_ln,
@@ -172,36 +173,36 @@ class RegisteredEmail {
         s.student_yr_lvl
       FROM accounts a
       LEFT JOIN students s ON s.account_id = a.account_id
-      WHERE a.email IN (${placeholders})`,
-      uniqueEmails
+      WHERE a.email IN (${eligiblePlaceholders})`,
+      eligibleEmails
     );
 
     // Check which users have complete profiles
     const usersWithCompleteProfiles = profileRows
-      .filter(row => 
-        row.student_fn && 
-        row.student_ln && 
-        row.student_gender && 
-        row.student_course && 
+      .filter(row =>
+        row.student_fn &&
+        row.student_ln &&
+        row.student_gender &&
+        row.student_course &&
         row.student_yr_lvl
       )
       .map(row => row.email);
 
     // 2️⃣ BULK Find existing registered emails
     const [existingRows] = await this.db.execute(
-      `SELECT email FROM registered_student_emails WHERE email IN (${placeholders})`,
-      uniqueEmails
+      `SELECT email FROM registered_student_emails WHERE email IN (${eligiblePlaceholders})`,
+      eligibleEmails
     );
 
     const existingEmails = existingRows.map(r => r.email);
 
     // 3️⃣ Filter new emails
-    const newEmails = uniqueEmails.filter(
+    const newEmails = eligibleEmails.filter(
       email => !existingEmails.includes(email)
     );
 
     // 4️⃣ Filter out users with complete profiles from receiving emails
-    const emailsToSend = uniqueEmails.filter(
+    const emailsToSend = eligibleEmails.filter(
       email => !usersWithCompleteProfiles.includes(email)
     );
 
@@ -253,6 +254,7 @@ class RegisteredEmail {
     return {
       inserted: insertedCount,
       skipped: existingEmails.length,
+      skippedAsProfessors: profEmails.length,
       emailsNotSent: usersWithCompleteProfiles.length,
       totalProcessed: uniqueEmails.length
     };

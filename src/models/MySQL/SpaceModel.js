@@ -1010,7 +1010,7 @@ class Space {
           -- Members as JSON array (no nulls, no duplicates)
           IFNULL(
               JSON_ARRAYAGG(
-                  DISTINCT CASE 
+                  CASE 
                       WHEN acc.account_id IS NOT NULL THEN
                           JSON_OBJECT(
                               'account_id', acc.account_id,
@@ -1030,7 +1030,7 @@ class Space {
                   END
               ),
               JSON_ARRAY()
-          ) AS members,
+          ) AS members
 
           at.acad_term_name,
           at.semester
@@ -1123,8 +1123,14 @@ class Space {
       };
 
       rows.forEach((space) => {
-        // Parse JSON safely
-        space.members = parseJSONSafe(space.members, []).filter(Boolean); // removes nulls
+        space.members = parseJSONSafe(space.members, [])
+          .filter(Boolean) // remove nulls
+          .filter(
+            (member, index, self) =>
+              index ===
+              self.findIndex((m) => m.account_id === member.account_id),
+          ); // remove duplicates
+
         space.professor = parseJSONSafe(space.professor, {
           name: "",
           avatar: "",

@@ -6,7 +6,7 @@ class Task {
   constructor() {
     this.user = new User();
     this.db = mysqlConnection;
-    this.logger = new Logger("SpaceModel");
+    this.logger = new Logger("TaskModel");
   }
 
   /**
@@ -32,22 +32,19 @@ class Task {
     try {
       await conn.beginTransaction();
 
-      // Insert main task
       const [taskResult] = await conn.query(
         `INSERT INTO tasks
-      (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date, task_start, task_end)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           space_id || null,
           c_space_id || null,
           taskData.task_category,
           taskData.task_title,
-          taskData.task_instruction || null,
-          taskData.lesson_id || null,
-          taskData.total_items_score || null,
-          taskData.due_date ? new Date(taskData.due_date) : null,
-          taskData.start_time || null,
-          taskData.end_time || null,
+          taskData.task_instruction,
+          taskData.lesson_id,
+          taskData.total_items_score || taskData.task_score,
+          new Date(taskData.due_date),
         ],
       );
 
@@ -55,78 +52,106 @@ class Task {
 
       /*
       ============================
-      TASK QUESTION GROUPS
+      GROUP ACTIVITY PROCESS
       ============================
     */
-      if (Array.isArray(taskData.task_question_groups)) {
-        for (const group of taskData.task_question_groups) {
-          // Insert the question group
+      if (taskData.task_category === "group-activity") {
+        if (Array.isArray(taskData.groups) && taskData.groups.length) {
+          // Insert groups
+          const groupRows = taskData.groups.map((g) => [taskId, g.group_name]);
           const [groupResult] = await conn.query(
-            `INSERT INTO task_question_groups
-           (task_id, group_lable, group_instruction)
-           VALUES (?, ?, ?)`,
-            [taskId, group.group_label, group.group_instruction || null],
+            `INSERT INTO task_groups (task_id, group_name) VALUES ?`,
+            [groupRows],
           );
 
-          const groupId = groupResult.insertId;
+          // Get the inserted group IDs
+          const insertedGroupIds = [];
+          let currentId = groupResult.insertId;
+          for (let i = 0; i < taskData.groups.length; i++) {
+            insertedGroupIds.push(currentId + i);
+          }
 
-          // Insert questions for this group
-          if (Array.isArray(group.group_questions)) {
-            const questionRows = group.group_questions.map((q, idx) => [
-              taskId,
-              groupId,
-              q.question_type,
-              q.question,
-              q.identification_answer || null,
-              q.point || 1,
-              idx + 1,
-            ]);
-
-            const [questionResult] = await conn.query(
-              `INSERT INTO task_questions
-             (task_id, group_id, question_type, question, identification_answer, point, position)
-             VALUES ?`,
-              [questionRows],
-            );
-
-            const firstQuestionId = questionResult.insertId;
-
-            // Compute question IDs for choices
-            const questionIds = group.group_questions.map(
-              (_, idx) => firstQuestionId + idx,
-            );
-
-            // Insert choices
-            const choiceRows = [];
-            group.group_questions.forEach((q, qIdx) => {
-              if (
-                (q.question_type === "mcq" ||
-                  q.question_type === "true-false") &&
-                Array.isArray(q.choices)
-              ) {
-                const questionId = questionIds[qIdx];
-
-                q.choices.forEach((c) => {
-                  choiceRows.push([
-                    questionId,
-                    c.letter_identifier,
-                    c.choice_answer,
-                    c.is_correct ? 1 : 0,
-                  ]);
-                });
-              }
+          // Insert group members
+          const memberRows = [];
+          taskData.groups.forEach((g, idx) => {
+            const groupId = insertedGroupIds[idx];
+            g.members.forEach((m) => {
+              memberRows.push([groupId, m.account_id, m.role]);
             });
+          });
 
-            if (choiceRows.length) {
-              await conn.query(
-                `INSERT INTO task_choices
-               (question_id, letter_identifier, choice_answer, is_right_answer)
-               VALUES ?`,
-                [choiceRows],
-              );
-            }
+          if (memberRows.length) {
+            await conn.query(
+              `INSERT INTO task_group_members (group_id, account_id, member_role) VALUES ?`,
+              [memberRows],
+            );
           }
         }
+
+        await conn.commit();
+        return taskId;
+      }
+
+      /*
+      ============================
+      QUIZ / EXAM / INDIVIDUAL
+      ============================
+    */
+
+      if (!taskData.questions?.length) {
+        await conn.commit();
+        return taskId;
+      }
+
+      const questionRows = taskData.questions.map((q, idx) => [
+        taskId,
+        q.question_type,
+        q.question,
+        q.identification_answer || null,
+        q.point,
+        idx + 1,
+      ]);
+
+      const [questionResult] = await conn.query(
+        `INSERT INTO task_questions
+      (task_id, question_type, question, identification_answer, point, position)
+      VALUES ?`,
+        [questionRows],
+      );
+
+      const firstQuestionId = questionResult.insertId;
+
+      const questionIds = taskData.questions.map(
+        (_, idx) => firstQuestionId + idx,
+      );
+
+      const choiceRows = [];
+
+      taskData.questions.forEach((q, qIdx) => {
+        if (
+          (q.question_type === "mcq" || q.question_type === "true-false") &&
+          Array.isArray(q.choices)
+        ) {
+          const questionId = questionIds[qIdx];
+
+          q.choices.forEach((c) => {
+            choiceRows.push([
+              questionId,
+              c.letter_identifier,
+              c.choice_answer,
+              c.isRightAnswer,
+            ]);
+          });
+        }
+      });
+
+      if (choiceRows.length) {
+        await conn.query(
+          `INSERT INTO task_choices
+        (question_id, letter_identifier, choice_answer, is_right_answer)
+        VALUES ?`,
+          [choiceRows],
+        );
       }
 
       await conn.commit();

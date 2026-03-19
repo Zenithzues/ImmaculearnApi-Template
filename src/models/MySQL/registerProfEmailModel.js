@@ -88,7 +88,7 @@ class RegisteredProfEmail {
       <td style="padding:20px;">
       <b style="color:#333;">Complete Your Profile</b><br>
       <span style="color:#666;font-size:14px;">
-      Click <b>Continue with Gmail</b> and complete your professor profile by filling in your name,
+      Click <b>Continue with Gmail</b> and complete your profile by filling in your name,
       department, and other required information.
       </span>
       </td>

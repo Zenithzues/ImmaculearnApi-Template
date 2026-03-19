@@ -32,6 +32,17 @@ class Task {
     try {
       await conn.beginTransaction();
 
+      // ✅ Basic validation for exam
+      if (taskData.task_category === "exam") {
+        if (
+          !taskData.task_question_groups?.length &&
+          !taskData.questions?.length
+        ) {
+          throw new Error("Exam must have questions");
+        }
+      }
+
+      // ✅ Insert main task
       const [taskResult] = await conn.query(
         `INSERT INTO tasks
       (space_id, c_space_id, task_category, task_title, task_instruction, lesson_id, total_items_score, due_date)
@@ -41,40 +52,43 @@ class Task {
           c_space_id || null,
           taskData.task_category,
           taskData.task_title,
-          taskData.task_instruction,
-          taskData.lesson_id,
-          taskData.total_items_score || taskData.task_score,
-          new Date(taskData.due_date),
+          taskData.task_instruction || null,
+          taskData.lesson_id || null,
+          taskData.total_items_score || taskData.task_score || null,
+          taskData.due_date ? new Date(taskData.due_date) : null,
         ],
       );
 
       const taskId = taskResult.insertId;
 
       /*
-      ============================
-      GROUP ACTIVITY PROCESS
-      ============================
+    ============================
+    GROUP ACTIVITY PROCESS
+    ============================
     */
       if (taskData.task_category === "group-activity") {
         if (Array.isArray(taskData.groups) && taskData.groups.length) {
           // Insert groups
           const groupRows = taskData.groups.map((g) => [taskId, g.group_name]);
+
           const [groupResult] = await conn.query(
             `INSERT INTO task_groups (task_id, group_name) VALUES ?`,
             [groupRows],
           );
 
-          // Get the inserted group IDs
+          // ⚠️ still using sequential IDs (acceptable for groups usually)
           const insertedGroupIds = [];
           let currentId = groupResult.insertId;
+
           for (let i = 0; i < taskData.groups.length; i++) {
             insertedGroupIds.push(currentId + i);
           }
 
-          // Insert group members
+          // Insert members
           const memberRows = [];
           taskData.groups.forEach((g, idx) => {
             const groupId = insertedGroupIds[idx];
+
             g.members.forEach((m) => {
               memberRows.push([groupId, m.account_id, m.role]);
             });
@@ -82,7 +96,9 @@ class Task {
 
           if (memberRows.length) {
             await conn.query(
-              `INSERT INTO task_group_members (group_id, account_id, member_role) VALUES ?`,
+              `INSERT INTO task_group_members
+             (group_id, account_id, member_role)
+             VALUES ?`,
               [memberRows],
             );
           }
@@ -93,37 +109,123 @@ class Task {
       }
 
       /*
-      ============================
-      QUIZ / EXAM / INDIVIDUAL
-      ============================
+    ============================
+    QUIZ / EXAM / INDIVIDUAL
+    ============================
     */
 
+      /*
+    ✅ PRIORITY: GROUPED QUESTIONS
+    */
+      if (
+        Array.isArray(taskData.task_question_groups) &&
+        taskData.task_question_groups.length
+      ) {
+        for (const group of taskData.task_question_groups) {
+          // ✅ Validate group
+          if (!group.group_label) {
+            throw new Error("Group label is required");
+          }
+
+          const [groupResult] = await conn.query(
+            `INSERT INTO task_question_groups
+           (task_id, group_lable, group_instruction)
+           VALUES (?, ?, ?)`,
+            [taskId, group.group_label, group.group_instruction || null],
+          );
+
+          const groupId = groupResult.insertId;
+
+          if (!group.group_questions?.length) continue;
+
+          const questionIds = [];
+
+          // ✅ SAFE: insert one by one
+          for (let i = 0; i < group.group_questions.length; i++) {
+            const q = group.group_questions[i];
+
+            const [qResult] = await conn.query(
+              `INSERT INTO task_questions
+             (task_id, group_id, question_type, question, identification_answer, point, position)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                taskId,
+                groupId,
+                q.question_type,
+                q.question,
+                q.identification_answer || null,
+                q.point || 1,
+                i + 1,
+              ],
+            );
+
+            questionIds.push(qResult.insertId);
+          }
+
+          // Insert choices
+          const choiceRows = [];
+
+          group.group_questions.forEach((q, qIdx) => {
+            if (
+              (q.question_type === "mcq" || q.question_type === "true-false") &&
+              Array.isArray(q.choices)
+            ) {
+              const questionId = questionIds[qIdx];
+
+              q.choices.forEach((c) => {
+                choiceRows.push([
+                  questionId,
+                  c.letter_identifier,
+                  c.choice_answer,
+                  c.isRightAnswer ? 1 : 0,
+                ]);
+              });
+            }
+          });
+
+          if (choiceRows.length) {
+            await conn.query(
+              `INSERT INTO task_choices
+             (question_id, letter_identifier, choice_answer, is_right_answer)
+             VALUES ?`,
+              [choiceRows],
+            );
+          }
+        }
+
+        await conn.commit();
+        return taskId;
+      }
+
+      /*
+    ✅ FALLBACK: NON-GROUP QUESTIONS (LEGACY)
+    */
       if (!taskData.questions?.length) {
         await conn.commit();
         return taskId;
       }
 
-      const questionRows = taskData.questions.map((q, idx) => [
-        taskId,
-        q.question_type,
-        q.question,
-        q.identification_answer || null,
-        q.point,
-        idx + 1,
-      ]);
+      const questionIds = [];
 
-      const [questionResult] = await conn.query(
-        `INSERT INTO task_questions
-      (task_id, question_type, question, identification_answer, point, position)
-      VALUES ?`,
-        [questionRows],
-      );
+      for (let i = 0; i < taskData.questions.length; i++) {
+        const q = taskData.questions[i];
 
-      const firstQuestionId = questionResult.insertId;
+        const [qResult] = await conn.query(
+          `INSERT INTO task_questions
+         (task_id, question_type, question, identification_answer, point, position)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            taskId,
+            q.question_type,
+            q.question,
+            q.identification_answer || null,
+            q.point || 1,
+            i + 1,
+          ],
+        );
 
-      const questionIds = taskData.questions.map(
-        (_, idx) => firstQuestionId + idx,
-      );
+        questionIds.push(qResult.insertId);
+      }
 
       const choiceRows = [];
 
@@ -139,7 +241,7 @@ class Task {
               questionId,
               c.letter_identifier,
               c.choice_answer,
-              c.isRightAnswer,
+              c.isRightAnswer ? 1 : 0,
             ]);
           });
         }
@@ -148,8 +250,8 @@ class Task {
       if (choiceRows.length) {
         await conn.query(
           `INSERT INTO task_choices
-        (question_id, letter_identifier, choice_answer, is_right_answer)
-        VALUES ?`,
+         (question_id, letter_identifier, choice_answer, is_right_answer)
+         VALUES ?`,
           [choiceRows],
         );
       }
